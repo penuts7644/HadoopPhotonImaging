@@ -18,7 +18,7 @@
 
 The jar file can be run via the Hadoop client's command-line. With the command below, you can run the program.
 
-    hadoop jar HadoopPhotonImaging.jar nl.bioinf.lscheffer_wvanhelvoirt.hadoopphotonimaging.ParallelPhotonImageProcessor -D input.files=[input file/files] -D output.dir=[output directory] -D mapreduce.job.name=[job name]
+    hadoop jar HadoopPhotonImaging.jar nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhotonImaging.ParallelPhotonImageProcessor -D input.files=[input file/files] -D output.dir=[output directory] -D mapreduce.job.name=[job name]
 
 The command consists out of:
 
