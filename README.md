@@ -18,11 +18,11 @@
 
 The jar file can be run via the Hadoop client's command-line. With the command below, you can run the program.
 
-    hadoop jar HadoopPhotonImaging.jar nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhotonImaging.ParallelPhotonImageProcessor -D input.files=[input file/files] -D output.dir=[output directory] -D mapreduce.job.name=[job name]
+    yarn jar HadoopPhotonImaging.jar nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhotonImaging.ParallelPhotonImageProcessor -D input.files=[input file/files] -D output.dir=[output directory] -D mapreduce.job.name=[job name]
 
 The command consists out of:
 
-* Main Hadoop command.
+* Main Hadoop yarn command.
 * The path to the jar file.
 * The main class address.
 * The input file or files in an directory.
