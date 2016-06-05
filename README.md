@@ -18,7 +18,7 @@
 
 The jar file can be run via the Hadoop client's command-line. With the command below, you can run the program.
 
-    yarn jar HadoopPhotonImaging.jar nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhotonImaging.ParallelPhotonImageProcessor -D input.files=[input file/files] -D output.dir=[output directory] -D mapreduce.job.name=[job name]
+    yarn jar HadoopPhotonImaging.jar nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhotonImaging.ParallelPhotonImageProcessor -D input.files=[input file/files] -D output.dir=[output directory] -D mapreduce.job.name=[job name] -D method=[method type] -D tolerance=[amount of noise tolerance] -D preprocessing=[true or false]
 
 The command consists out of:
 
@@ -28,3 +28,7 @@ The command consists out of:
 * The input file or files in an directory.
 * An output directory.
 * Optional is to set the job name (mapreduce.job.name). Default value is 'PhotonImageProcess'.
+* Optional is to set the method type (method), 'Fast', 'Accurate' and 'Subpixel'. Default value is 'Fast'.
+* Optional is to set the noise tolerance (tolerance). Default value is '100'.
+* Optional is to enable preprocessing (preprocessing), 'true' or 'false'. Default value is 'true'.
+

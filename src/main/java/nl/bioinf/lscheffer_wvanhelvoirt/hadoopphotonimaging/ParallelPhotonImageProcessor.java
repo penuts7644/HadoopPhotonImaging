@@ -30,7 +30,7 @@ import org.apache.hadoop.util.ToolRunner;
  *
  * This class runs the Hadoop MapReduce job. It assigns a mapper and reducer and is able to run the PhotonImageProcessor
  * class written for ImageJ/Fiji. Users can change the job name by assigning a value to the 'mapreduce.job.name' option.
- * 'input.dir' and 'output.dir' options are required.
+ * 'input.files' and 'output.dir' options are required.
  *
  * @author Lonneke Scheffer and Wout van Helvoirt
  */
