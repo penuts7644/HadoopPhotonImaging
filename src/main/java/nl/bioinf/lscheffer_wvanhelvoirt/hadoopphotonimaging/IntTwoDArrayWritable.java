@@ -32,7 +32,7 @@ import java.io.IOException;
 public class IntTwoDArrayWritable implements Writable {
 
     /** The class type. */
-    private Class valueClass;
+    private final Class valueClass;
     /** A IntWritable two D array to be used internally. */
     private IntWritable[][] values;
 
@@ -82,7 +82,9 @@ public class IntTwoDArrayWritable implements Writable {
      * @param in DataInput which will be set in a new IntWritable two D array.
      * @throws IOException Returns default error.
      */
-    public void readFields(DataInput in) throws IOException {
+    public void readFields(DataInput in)
+            throws IOException {
+
         // Construct the IntWritable two D array.
         this.values = new IntWritable[in.readInt()][];
         for (int i = 0; i < this.values.length; i++) {
@@ -110,7 +112,9 @@ public class IntTwoDArrayWritable implements Writable {
      * @param out DataOutput which will be filled with values from the IntWritable two D array.
      * @throws IOException Returns default error.
      */
-    public void write(DataOutput out) throws IOException {
+    public void write(DataOutput out)
+            throws IOException {
+
         out.writeInt(this.values.length);
         for (int i = 0; i < this.values.length; i++) {
             out.writeInt(this.values[i].length);

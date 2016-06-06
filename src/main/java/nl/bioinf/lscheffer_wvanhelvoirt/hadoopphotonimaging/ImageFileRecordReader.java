@@ -70,7 +70,9 @@ public class ImageFileRecordReader extends RecordReader<NullWritable, BytesWrita
      * @throws IOException Returns default exception.
      */
     @Override
-    public void close() throws IOException {
+    public void close()
+            throws IOException {
+
         // Not used.
     }
 
@@ -82,7 +84,9 @@ public class ImageFileRecordReader extends RecordReader<NullWritable, BytesWrita
      * @throws InterruptedException Returns default exception.
      */
     @Override
-    public NullWritable getCurrentKey() throws IOException, InterruptedException {
+    public NullWritable getCurrentKey()
+            throws IOException, InterruptedException {
+
         return NullWritable.get();
     }
 
@@ -95,7 +99,9 @@ public class ImageFileRecordReader extends RecordReader<NullWritable, BytesWrita
      * @throws InterruptedException Returns default exception.
      */
     @Override
-    public BytesWritable getCurrentValue() throws IOException, InterruptedException {
+    public BytesWritable getCurrentValue()
+            throws IOException, InterruptedException {
+
         return this.mFileBytes;
     }
 
@@ -108,7 +114,9 @@ public class ImageFileRecordReader extends RecordReader<NullWritable, BytesWrita
      * @throws InterruptedException Returns default exception.
      */
     @Override
-    public float getProgress() throws IOException, InterruptedException {
+    public float getProgress()
+            throws IOException, InterruptedException {
+
         return (this.mProcessed) ? (float) 1.0 : (float) 0.0;
     }
 
@@ -121,7 +129,9 @@ public class ImageFileRecordReader extends RecordReader<NullWritable, BytesWrita
      * @throws InterruptedException Returns default exception.
      */
     @Override
-    public void initialize(InputSplit split, TaskAttemptContext context) throws IOException, InterruptedException {
+    public void initialize(InputSplit split, TaskAttemptContext context)
+            throws IOException, InterruptedException {
+
         // Not used.
     }
 
@@ -135,7 +145,8 @@ public class ImageFileRecordReader extends RecordReader<NullWritable, BytesWrita
      * @throws InterruptedException If there is an error.
      */
     @Override
-    public boolean nextKeyValue() throws IOException, InterruptedException {
+    public boolean nextKeyValue()
+            throws IOException, InterruptedException {
 
         // If file not processed, process it.
         if (!this.mProcessed) {

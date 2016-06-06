@@ -47,15 +47,24 @@ public class ImageMapper extends Mapper<NullWritable, BytesWritable, NullWritabl
      * @throws InterruptedException When connection was interrupted.
      */
     @Override
-    public void map(NullWritable key, BytesWritable value, Context context) throws IOException, InterruptedException {
+    public void map(NullWritable key, BytesWritable value, Context context)
+            throws IOException, InterruptedException {
 
         // Get the configuration and initialize the PhotonImageProcessor class.
         Configuration conf = context.getConfiguration();
-        PhotonImageProcessor pip = new PhotonImageProcessor(new ByteArrayInputStream(value.getBytes()), conf.getInt("tolerance", 100), conf.get("method", "Fast"), conf.getBoolean("preprocessing", true));
 
-        // Run the PhotonImageProcessor on the given image and retrieve IntWritable two D array output.
-        // Add the IntWritable two D array to the IntTwoDArrayWritable wrapper and return the result.
-        this.photonCountMatrix = new IntTwoDArrayWritable(IntWritable.class, pip.createPhotonCountMatrix());
-        context.write(NullWritable.get(), this.photonCountMatrix);
+        // Try to instantiate the processor.
+        try {
+            PhotonImageProcessor pip = new PhotonImageProcessor(new ByteArrayInputStream(value.getBytes()),
+                    conf.getInt("tolerance", 100), conf.get("method", "Fast"), conf.getBoolean("preprocessing", true));
+
+            // Run the PhotonImageProcessor on the given image and retrieve IntWritable two D array output.
+            // Add the IntWritable two D array to the IntTwoDArrayWritable wrapper and return the result.
+            this.photonCountMatrix = new IntTwoDArrayWritable(IntWritable.class, pip.createPhotonCountMatrix());
+            context.write(NullWritable.get(), this.photonCountMatrix);
+        } catch (NullPointerException e) {
+
+            // If error on file, skip this map.
+        }
     }
 }

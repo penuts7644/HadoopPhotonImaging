@@ -65,7 +65,8 @@ public final class ParallelPhotonImageProcessor extends Configured implements To
      * @throws Exception will be caught in the main.
      */
     @Override
-    public int run(String[] args) throws Exception {
+    public int run(String[] args)
+            throws Exception {
 
         // Set filesystem and get the configuration given by ToolRunner.
         Configuration conf = this.getConf();
@@ -77,7 +78,7 @@ public final class ParallelPhotonImageProcessor extends Configured implements To
 
         // Set the mapper and reducer classes.
         job.setMapperClass(ImageMapper.class);
-        job.setReducerClass(CountMatrixReducer.class);
+        job.setReducerClass(MatrixReducer.class);
 
         // Specify the mapper output key and value classes.
         job.setOutputKeyClass(NullWritable.class);

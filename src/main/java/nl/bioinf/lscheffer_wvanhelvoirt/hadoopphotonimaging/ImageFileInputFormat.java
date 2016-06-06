@@ -25,7 +25,6 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
-
 import java.io.IOException;
 
 /**
@@ -58,10 +57,8 @@ public class ImageFileInputFormat extends FileInputFormat<NullWritable, BytesWri
      * @throws IOException If there is an error.
      */
     @Override
-    public RecordReader<NullWritable, BytesWritable> createRecordReader(InputSplit split, TaskAttemptContext context) throws IOException {
-        if (!(split instanceof FileSplit)) {
-            throw new IllegalArgumentException("split must be a FileSplit");
-        }
+    public RecordReader<NullWritable, BytesWritable> createRecordReader(InputSplit split, TaskAttemptContext context)
+            throws IOException {
 
         // Return the new ImageFileRecordReader.
         return new ImageFileRecordReader((FileSplit) split, context);

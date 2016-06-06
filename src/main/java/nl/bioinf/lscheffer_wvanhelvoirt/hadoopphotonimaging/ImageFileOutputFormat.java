@@ -25,7 +25,7 @@ import java.io.IOException;
 /**
  * ImageFileOutputFormat
  *
- * This is a custom OutputFormat class for image file .
+ * This is a custom OutputFormat class for image files.
  *
  * @author Lonneke Scheffer and Wout van Helvoirt
  */
@@ -39,7 +39,8 @@ public class ImageFileOutputFormat extends FileOutputFormat<NullWritable, IntTwo
      * @throws IOException If there is an error.
      */
     @Override
-    public RecordWriter<NullWritable, IntTwoDArrayWritable> getRecordWriter(TaskAttemptContext context) throws IOException, InterruptedException {
+    public RecordWriter<NullWritable, IntTwoDArrayWritable> getRecordWriter(TaskAttemptContext context)
+            throws IOException, InterruptedException {
 
         // Return the new ImageFileRecordWriter.
         return new ImageFileRecordWriter(context);

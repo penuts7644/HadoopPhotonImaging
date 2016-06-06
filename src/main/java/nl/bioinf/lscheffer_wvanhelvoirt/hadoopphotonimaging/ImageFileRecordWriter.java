@@ -25,7 +25,6 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.util.Arrays;
 
 /**
  * ImageFileRecordWriter
@@ -61,7 +60,8 @@ public class ImageFileRecordWriter extends RecordWriter<NullWritable, IntTwoDArr
      * @throws InterruptedException If connection problem.
      */
     @Override
-    public void write(NullWritable key, IntTwoDArrayWritable value) throws IOException, InterruptedException {
+    public void write(NullWritable key, IntTwoDArrayWritable value)
+            throws IOException, InterruptedException {
 
         // Set the filesystem and delete path if it exists.
         FileSystem hdfs = FileSystem.get(this.mConf);
@@ -82,7 +82,9 @@ public class ImageFileRecordWriter extends RecordWriter<NullWritable, IntTwoDArr
      * @throws InterruptedException If connection problem.
      */
     @Override
-    public void close(TaskAttemptContext context) throws IOException, InterruptedException {
+    public void close(TaskAttemptContext context)
+            throws IOException, InterruptedException {
+
         // no-op
     }
 }
