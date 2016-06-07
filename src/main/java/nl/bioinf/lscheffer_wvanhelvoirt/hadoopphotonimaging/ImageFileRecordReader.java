@@ -26,35 +26,45 @@ import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
+
 import java.io.IOException;
 import java.io.InputStream;
 
 /**
  * ImageFileRecordReader
- *
  * This is a custom class to create a RecordReader for each split.
  *
  * @author Lonneke Scheffer and Wout van Helvoirt
  */
 public class ImageFileRecordReader extends RecordReader<NullWritable, BytesWritable> {
 
-    /** The path to the file to read. */
+    /**
+     * The path to the file to read.
+     */
     private final Path mFileToRead;
-    /** The length of this file. */
+    /**
+     * The length of this file.
+     */
     private final long mFileLength;
-    /** The Configuration. */
+    /**
+     * The Configuration.
+     */
     private final Configuration mConf;
-    /** Whether this FileSplit has been processed. */
-    private boolean mProcessed;
-    /** A BytesWritable to store the byte array. */
+    /**
+     * A BytesWritable to store the byte array.
+     */
     private final BytesWritable mFileBytes;
+    /**
+     * Whether this FileSplit has been processed.
+     */
+    private boolean mProcessed;
 
     /**
      * Implementation detail: This constructor is built to be called via
      * reflection from within FileRecordReader.
      *
      * @param fileSplit The FileSplit that this will read from.
-     * @param context The context for this task.
+     * @param context   The context for this task.
      */
     public ImageFileRecordReader(FileSplit fileSplit, TaskAttemptContext context) {
         this.mProcessed = false;
@@ -80,7 +90,7 @@ public class ImageFileRecordReader extends RecordReader<NullWritable, BytesWrita
      * Override method that returns a NullWritable as key, because key is not being used.
      *
      * @return NullWritable because key will not be used in program.
-     * @throws IOException Returns default exception.
+     * @throws IOException          Returns default exception.
      * @throws InterruptedException Returns default exception.
      */
     @Override
@@ -95,7 +105,7 @@ public class ImageFileRecordReader extends RecordReader<NullWritable, BytesWrita
      * this returns the contents of the file as a BytesWritable. Otherwise, it returns an empty BytesWritable.
      *
      * @return BytesWritable containing the contents of the file.
-     * @throws IOException Returns default exception.
+     * @throws IOException          Returns default exception.
      * @throws InterruptedException Returns default exception.
      */
     @Override
@@ -110,7 +120,7 @@ public class ImageFileRecordReader extends RecordReader<NullWritable, BytesWrita
      * not be split.
      *
      * @return Float 0.0 if the file has not been processed. 1.0 if it has.
-     * @throws IOException Returns default exception.
+     * @throws IOException          Returns default exception.
      * @throws InterruptedException Returns default exception.
      */
     @Override
@@ -123,9 +133,9 @@ public class ImageFileRecordReader extends RecordReader<NullWritable, BytesWrita
     /**
      * Override method for instantiation. Not used.
      *
-     * @param split The InputSplit to read.
+     * @param split   The InputSplit to read.
      * @param context The context for this task.
-     * @throws IOException Returns default exception.
+     * @throws IOException          Returns default exception.
      * @throws InterruptedException Returns default exception.
      */
     @Override
@@ -141,7 +151,7 @@ public class ImageFileRecordReader extends RecordReader<NullWritable, BytesWrita
      * true. If it has already been read, then returns false without updating any internal state.
      *
      * @return Boolean whether the file was read or not.
-     * @throws IOException If there is an error reading the file.
+     * @throws IOException          If there is an error reading the file.
      * @throws InterruptedException If there is an error.
      */
     @Override

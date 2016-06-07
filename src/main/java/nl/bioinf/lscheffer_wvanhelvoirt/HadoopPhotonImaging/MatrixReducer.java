@@ -19,29 +19,33 @@ package nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhotonImaging;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Reducer;
+
 import java.io.IOException;
 
 /**
  * MatrixReducer
- *
  * The Reducer class that combines the data from all the mappers to a single two D array.
  *
  * @author Lonneke Scheffer and Wout van Helvoirt
  */
 public class MatrixReducer extends Reducer<NullWritable, IntTwoDArrayWritable, NullWritable, IntTwoDArrayWritable> {
 
-    /** Final IntTwoDArrayWritable with combined counts. */
+    /**
+     * Final IntTwoDArrayWritable with combined counts.
+     */
     private IntTwoDArrayWritable finalPhotonCountMatrix;
-    /** A Intermediate two D array. */
+    /**
+     * A Intermediate two D array.
+     */
     private IntWritable[][] photonCountMatrix;
 
     /**
      * Override method that processes all mapper outputs to one two D array, ready to be written as file.
      *
-     * @param key NullWritable will not be used.
-     * @param values Iterable with IntTwoDArrayWritable items from each mapper.
+     * @param key     NullWritable will not be used.
+     * @param values  Iterable with IntTwoDArrayWritable items from each mapper.
      * @param context Context containing job information.
-     * @throws IOException When something went wrong.
+     * @throws IOException          When something went wrong.
      * @throws InterruptedException When connection was interrupted.
      */
     @Override
@@ -64,7 +68,7 @@ public class MatrixReducer extends Reducer<NullWritable, IntTwoDArrayWritable, N
                         }
                     }
 
-                // Other images will add there values to the photonCountMatrix.
+                    // Other images will add there values to the photonCountMatrix.
                 } else {
                     for (int i = 0; i < matrix[0].length; i++) {
                         for (int j = 0; j < matrix.length; j++) {

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>nl.bioinf.lscheffer_wvanhelvoirt</groupId>
     <artifactId>HadoopPhotonImaging</artifactId>
@@ -28,10 +29,14 @@
         <maven.compiler.source>1.7</maven.compiler.source>
         <maven.compiler.target>1.7</maven.compiler.target>
     </properties>
-    
-    <description>This project is a modified version of the PhotonImaging plug-in for ImageJ. The Hadoop version is able to process single photon event data, by locating the center point of each photon. The reduce stage combines all the two D arrays from the mappers into one 16-bit greyscale image. Each pixel contains the amount of found photons and are mapped to the correct pixel value.</description>
+
+    <description>This project is a modified version of the PhotonImaging plug-in for ImageJ. The Hadoop version is able
+        to process single photon event data, by locating the center point of each photon. The reduce stage combines all
+        the two D arrays from the mappers into one 16-bit greyscale image. Each pixel contains the amount of found
+        photons and are mapped to the correct pixel value.
+    </description>
     <name>HadoopPhotonImaging</name>
-    
+
     <developers>
         <developer>
             <id>wvh</id>
@@ -39,8 +44,8 @@
             <email>wout.van.helvoirt@gmail.com</email>
             <url>http://www.bioinf.nl/~wvanhelvoirt</url>
             <roles>
-                    <role>architect</role>
-                    <role>developer</role>
+                <role>architect</role>
+                <role>developer</role>
             </roles>
             <timezone>+1</timezone>
         </developer>
@@ -50,8 +55,8 @@
             <email>lonsch96@live.nl</email>
             <url>http://www.bioinf.nl/~lscheffer</url>
             <roles>
-                    <role>architect</role>
-                    <role>developer</role>
+                <role>architect</role>
+                <role>developer</role>
             </roles>
             <timezone>+1</timezone>
         </developer>

@@ -1,9 +1,17 @@
 package nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhotonImaging;
-import ij.plugin.filter.*;
-import ij.*;
+
+import ij.IJ;
+import ij.ImagePlus;
+import ij.ImageStack;
+import ij.Prefs;
 import ij.gui.Roi;
-import ij.process.*;
 import ij.plugin.ContrastEnhancer;
+import ij.plugin.filter.PlugInFilter;
+import ij.plugin.filter.PlugInFilterRunner;
+import ij.process.ColorProcessor;
+import ij.process.FloatProcessor;
+import ij.process.ImageProcessor;
+
 import java.awt.*;
 import java.util.Arrays;
 
@@ -21,29 +29,290 @@ public class SilentRankFilters implements PlugInFilter {
     public static final int BRIGHT_OUTLIERS = 0, DARK_OUTLIERS = 1;
     private static final String[] outlierStrings = {"Bright", "Dark"};
     private static int HIGHEST_FILTER = CLOSE;
+    // Remember filter parameters for the next time
+    private static double[] lastRadius = new double[HIGHEST_FILTER + 1]; //separate for each filter type
+    private static double lastThreshold = 50.;
+    private static int lastWhichOutliers = BRIGHT_OUTLIERS;
+    //
+    // F u r t h e r   c l a s s   v a r i a b l e s
+    int flags = DOES_ALL | SUPPORTS_MASKING;
     // Filter parameters
     private double radius;
     private double threshold;
     private int whichOutliers;
     private int filterType;
-    // Remember filter parameters for the next time
-    private static double[] lastRadius = new double[HIGHEST_FILTER + 1]; //separate for each filter type
-    private static double lastThreshold = 50.;
-    private static int lastWhichOutliers = BRIGHT_OUTLIERS;
-    // 
-    // F u r t h e r   c l a s s   v a r i a b l e s
-    int flags = DOES_ALL | SUPPORTS_MASKING;
     private ImagePlus imp;
-    private int nPasses = 1;			// The number of passes (color channels * stack slices)
+    private int nPasses = 1;            // The number of passes (color channels * stack slices)
     private PlugInFilterRunner pfr;
     private int pass;
     // M u l t i t h r e a d i n g - r e l a t e d
     private int numThreads = Prefs.getThreads();
     // Current state of processing is in class variables. Thus, stack parallelization must be done
     // ONLY with one thread for the image (not using these class variables):
-    private int highestYinCache;		// the highest line read into the cache so far
-    private boolean threadWaiting;		// a thread waits until it may read data
-    private boolean copyingToCache;		// whether a thread is currently copying data to the cache
+    private int highestYinCache;        // the highest line read into the cache so far
+    private boolean threadWaiting;        // a thread waits until it may read data
+    private boolean copyingToCache;        // whether a thread is currently copying data to the cache
+
+    /**
+     * Read a line into the cache (including padding in x). If y>=height, instead of reading new data, it duplicates the
+     * line y=height-1. If y==0, it also creates the data for y<0, as far as necessary, thus filling the cache with more
+     * than one line (padding by duplicating the y=0 row).
+     */
+    private static void readLineToCacheOrPad(Object pixels, int width, int height, int roiY, int xminInside, int widthInside,
+                                             float[] cache, int cacheWidth, int cacheHeight, int padLeft, int padRight, int colorChannel,
+                                             int kHeight, int y) {
+        int lineInCache = y % cacheHeight;
+        if (y < height) {
+            readLineToCache(pixels, y * width, xminInside, widthInside,
+                    cache, lineInCache * cacheWidth, padLeft, padRight, colorChannel);
+            if (y == 0) {
+                for (int prevY = roiY - kHeight / 2; prevY < 0; prevY++) {    //for y<0, pad with y=0 border pixels
+                    int prevLineInCache = cacheHeight + prevY;
+                    System.arraycopy(cache, 0, cache, prevLineInCache * cacheWidth, cacheWidth);
+                }
+            }
+        } else {
+            System.arraycopy(cache, cacheWidth * ((height - 1) % cacheHeight), cache, lineInCache * cacheWidth, cacheWidth);
+        }
+    }
+
+    /**
+     * Read a line into the cache (includes conversion to flaot). Pad with edge pixels in x if necessary
+     */
+    private static void readLineToCache(Object pixels, int pixelLineP, int xminInside, int widthInside,
+                                        float[] cache, int cacheLineP, int padLeft, int padRight, int colorChannel) {
+        if (pixels instanceof byte[]) {
+            byte[] bPixels = (byte[]) pixels;
+            for (int pp = pixelLineP + xminInside, cp = cacheLineP + padLeft; pp < pixelLineP + xminInside + widthInside; pp++, cp++) {
+                cache[cp] = bPixels[pp] & 0xff;
+            }
+        } else if (pixels instanceof short[]) {
+            short[] sPixels = (short[]) pixels;
+            for (int pp = pixelLineP + xminInside, cp = cacheLineP + padLeft; pp < pixelLineP + xminInside + widthInside; pp++, cp++) {
+                cache[cp] = sPixels[pp] & 0xffff;
+            }
+        } else if (pixels instanceof float[]) {
+            System.arraycopy(pixels, pixelLineP + xminInside, cache, cacheLineP + padLeft, widthInside);
+        } else {    //RGB
+            int[] cPixels = (int[]) pixels;
+            int shift = 16 - 8 * colorChannel;
+            int byteMask = 255 << shift;
+            for (int pp = pixelLineP + xminInside, cp = cacheLineP + padLeft; pp < pixelLineP + xminInside + widthInside; pp++, cp++) {
+                cache[cp] = (cPixels[pp] & byteMask) >> shift;
+            }
+        }
+        for (int cp = cacheLineP; cp < cacheLineP + padLeft; cp++) {
+            cache[cp] = cache[cacheLineP + padLeft];
+        }
+        for (int cp = cacheLineP + padLeft + widthInside; cp < cacheLineP + padLeft + widthInside + padRight; cp++) {
+            cache[cp] = cache[cacheLineP + padLeft + widthInside - 1];
+        }
+    }
+
+    /**
+     * Write a line to pixels arrax, converting from float (not for float data!) No checking for overflow/underflow
+     */
+    private static void writeLineToPixels(float[] values, Object pixels, int pixelP, int length, int colorChannel) {
+        if (pixels instanceof byte[]) {
+            byte[] bPixels = (byte[]) pixels;
+            for (int i = 0, p = pixelP; i < length; i++, p++) {
+                bPixels[p] = (byte) (((int) (values[i] + 0.5f)) & 0xff);
+            }
+        } else if (pixels instanceof short[]) {
+            short[] sPixels = (short[]) pixels;
+            for (int i = 0, p = pixelP; i < length; i++, p++) {
+                sPixels[p] = (short) (((int) (values[i] + 0.5f)) & 0xffff);
+            }
+        } else {    //RGB
+            int[] cPixels = (int[]) pixels;
+            int shift = 16 - 8 * colorChannel;
+            int resetMask = 0xffffffff ^ (0xff << shift);
+            for (int i = 0, p = pixelP; i < length; i++, p++) {
+                cPixels[p] = (cPixels[p] & resetMask) | (((int) (values[i] + 0.5f)) << shift);
+            }
+        }
+    }
+
+    /**
+     * Get max (or -min if sign=-1) within the kernel area.
+     *
+     * @param x           between 0 and cacheWidth-1
+     * @param ignoreRight should be 0 for analyzing all data or 1 for leaving out the row at the right
+     * @param max         should be -Float.MAX_VALUE or the smallest value the maximum can be
+     */
+    private static float getAreaMax(float[] cache, int xCache0, int[] kernel, int ignoreRight, float max, float sign) {
+        for (int kk = 0; kk < kernel.length; kk++) {    // y within the cache stripe (we have 2 kernel pointers per cache line)
+            for (int p = kernel[kk++] + xCache0; p <= kernel[kk] + xCache0 - ignoreRight; p++) {
+                float v = cache[p] * sign;
+                if (max < v) {
+                    max = v;
+                }
+            }
+        }
+        return max;
+    }
+
+    /**
+     * Get max (or -min if sign=-1) at the right border inside or left border outside the kernel area. x between 0 and
+     * cacheWidth-1
+     */
+    private static float getSideMax(float[] cache, int xCache0, int[] kernel, boolean isRight, float sign) {
+        float max = -Float.MAX_VALUE;
+        if (!isRight) {
+            xCache0--;
+        }
+        for (int kk = isRight ? 1 : 0; kk < kernel.length; kk += 2) {    // y within the cache stripe (we have 2 kernel pointers per cache line)
+            float v = cache[xCache0 + kernel[kk]] * sign;
+            if (max < v) {
+                max = v;
+            }
+        }
+        return max;
+    }
+
+    /**
+     * Get sum of values and values squared within the kernel area. x between 0 and cacheWidth-1 Output is written to
+     * array sums[0] = sum; sums[1] = sum of squares
+     */
+    private static void getAreaSums(float[] cache, int xCache0, int[] kernel, double[] sums) {
+        double sum = 0, sum2 = 0;
+        for (int kk = 0; kk < kernel.length; kk++) {    // y within the cache stripe (we have 2 kernel pointers per cache line)
+            for (int p = kernel[kk++] + xCache0; p <= kernel[kk] + xCache0; p++) {
+                float v = cache[p];
+                sum += v;
+                sum2 += v * v;
+            }
+        }
+        sums[0] = sum;
+        sums[1] = sum2;
+        return;
+    }
+
+    /**
+     * Add all values and values squared at the right border inside minus at the left border outside the kernal area.
+     * Output is added or subtracted to/from array sums[0] += sum; sums[1] += sum of squares when at the right border,
+     * minus when at the left border
+     */
+    private static void addSideSums(float[] cache, int xCache0, int[] kernel, double[] sums) {
+        double sum = 0, sum2 = 0;
+        for (int kk = 0; kk < kernel.length; /*k++;k++ below*/) {
+            float v = cache[kernel[kk++] + (xCache0 - 1)];
+            sum -= v;
+            sum2 -= v * v;
+            v = cache[kernel[kk++] + xCache0];
+            sum += v;
+            sum2 += v * v;
+        }
+        sums[0] += sum;
+        sums[1] += sum2;
+        return;
+    }
+
+    /**
+     * Get median of values within kernel-sized neighborhood. Kernel size kNPoints should be odd.
+     */
+    private static float getMedian(float[] cache, int xCache0, int[] kernel,
+                                   float[] aboveBuf, float[] belowBuf, int kNPoints, float guess) {
+        int nAbove = 0, nBelow = 0;
+        for (int kk = 0; kk < kernel.length; kk++) {
+            for (int p = kernel[kk++] + xCache0; p <= kernel[kk] + xCache0; p++) {
+                float v = cache[p];
+                if (v > guess) {
+                    aboveBuf[nAbove] = v;
+                    nAbove++;
+                } else if (v < guess) {
+                    belowBuf[nBelow] = v;
+                    nBelow++;
+                }
+            }
+        }
+        int half = kNPoints / 2;
+        if (nAbove > half) {
+            return findNthLowestNumber(aboveBuf, nAbove, nAbove - half - 1);
+        } else if (nBelow > half) {
+            return findNthLowestNumber(belowBuf, nBelow, half);
+        } else {
+            return guess;
+        }
+    }
+
+    /**
+     * Get median of values within kernel-sized neighborhood. NaN data values are ignored; the output is NaN only if
+     * there are only NaN values in the kernel-sized neighborhood
+     */
+    private static float getNaNAwareMedian(float[] cache, int xCache0, int[] kernel,
+                                           float[] aboveBuf, float[] belowBuf, int kNPoints, float guess) {
+        int nAbove = 0, nBelow = 0;
+        for (int kk = 0; kk < kernel.length; kk++) {
+            for (int p = kernel[kk++] + xCache0; p <= kernel[kk] + xCache0; p++) {
+                float v = cache[p];
+                if (Float.isNaN(v)) {
+                    kNPoints--;
+                } else if (v > guess) {
+                    aboveBuf[nAbove] = v;
+                    nAbove++;
+                } else if (v < guess) {
+                    belowBuf[nBelow] = v;
+                    nBelow++;
+                }
+            }
+        }
+        if (kNPoints == 0) {
+            return Float.NaN;    //only NaN data in the neighborhood?
+        }
+        int half = kNPoints / 2;
+        if (nAbove > half) {
+            return findNthLowestNumber(aboveBuf, nAbove, nAbove - half - 1);
+        } else if (nBelow > half) {
+            return findNthLowestNumber(belowBuf, nBelow, half);
+        } else {
+            return guess;
+        }
+    }
+
+    /**
+     * Find the n-th lowest number in part of an array
+     *
+     * @param buf       The input array. Only values 0 ... bufLength are read. <code>buf</code> will be modified.
+     * @param bufLength Number of values in <code>buf</code> that should be read
+     * @param n         which value should be found; n=0 for the lowest, n=bufLength-1 for the highest
+     * @return the value
+     */
+    public final static float findNthLowestNumber(float[] buf, int bufLength, int n) {
+        // Hoare's find, algorithm, based on http://www.geocities.com/zabrodskyvlada/3alg.html
+        // Contributed by Heinz Klar
+        int i, j;
+        int l = 0;
+        int m = bufLength - 1;
+        float med = buf[n];
+        float dum;
+
+        while (l < m) {
+            i = l;
+            j = m;
+            do {
+                while (buf[i] < med) {
+                    i++;
+                }
+                while (med < buf[j]) {
+                    j--;
+                }
+                dum = buf[j];
+                buf[j] = buf[i];
+                buf[i] = dum;
+                i++;
+                j--;
+            } while ((j >= n) && (i <= n));
+            if (j < n) {
+                l = i;
+            }
+            if (n < i) {
+                m = j;
+            }
+            med = buf[n];
+        }
+        return med;
+    }
 
     private boolean isMultiStepFilter(int filterType) {
         return filterType >= OPEN;
@@ -52,9 +321,9 @@ public class SilentRankFilters implements PlugInFilter {
     /**
      * Setup of the PlugInFilter. Returns the flags specifying the capabilities and needs of the filter.
      *
-     * @param arg	Defines type of filter operation
-     * @param imp	The ImagePlus to be processed
-     * @return	Flags specifying further action of the PlugInFilterRunner
+     * @param arg Defines type of filter operation
+     * @param imp The ImagePlus to be processed
+     * @return Flags specifying further action of the PlugInFilterRunner
      */
     public int setup(String arg, ImagePlus imp) {
         this.imp = imp;
@@ -83,7 +352,7 @@ public class SilentRankFilters implements PlugInFilter {
                 IJ.error("RankFilters", "\"Remove NaNs\" requires a 32-bit image");
                 return DONE;
             }
-        } else if (arg.equals("final")) {	//after variance filter, adjust brightness and contrast
+        } else if (arg.equals("final")) {    //after variance filter, adjust brightness and contrast
             if (imp != null && imp.getBitDepth() != 8 && imp.getBitDepth() != 24 && imp.getRoi() == null) {
                 new ContrastEnhancer().stretchHistogram(imp.getProcessor(), 0.5);
             }
@@ -98,7 +367,7 @@ public class SilentRankFilters implements PlugInFilter {
             Roi roi = imp.getRoi();
             if (roi != null && !roi.getBounds().contains(new Rectangle(imp.getWidth(), imp.getHeight()))) //Roi < image? (actually tested: NOT (Roi>=image))
             {
-                flags |= SNAPSHOT;			//snapshot for resetRoiBoundary
+                flags |= SNAPSHOT;            //snapshot for resetRoiBoundary
             }
         }
         return flags;
@@ -115,9 +384,9 @@ public class SilentRankFilters implements PlugInFilter {
     /**
      * Filters an image by any method except 'despecle' or 'remove outliers'.
      *
-     * @param ip	The ImageProcessor that should be filtered (all 4 types supported)
-     * @param radius Determines the kernel size, see Process>Filters>Show Circular Masks. Must not be negative. No
-     * checking is done for large values that would lead to excessive computing times.
+     * @param ip         The ImageProcessor that should be filtered (all 4 types supported)
+     * @param radius     Determines the kernel size, see Process>Filters>Show Circular Masks. Must not be negative. No
+     *                   checking is done for large values that would lead to excessive computing times.
      * @param filterType May be MEAN, MIN, MAX, VARIANCE, or MEDIAN.
      */
     public void rank(ImageProcessor ip, double radius, int filterType) {
@@ -127,11 +396,11 @@ public class SilentRankFilters implements PlugInFilter {
     /**
      * Filters an image by any method except 'despecle' (for 'despeckle', use 'median' and radius=1)
      *
-     * @param ip The image subject to filtering
-     * @param radius The kernel radius
-     * @param filterType as defined above; DESPECKLE is not a valid type here; use median and a radius of 1.0 instead
+     * @param ip            The image subject to filtering
+     * @param radius        The kernel radius
+     * @param filterType    as defined above; DESPECKLE is not a valid type here; use median and a radius of 1.0 instead
      * @param whichOutliers BRIGHT_OUTLIERS or DARK_OUTLIERS for 'outliers' filter
-     * @param threshold Threshold for 'outliers' filter
+     * @param threshold     Threshold for 'outliers' filter
      */
     public void rank(ImageProcessor ip, double radius, int filterType, int whichOutliers, float threshold) {
         Rectangle roi = ip.getRoi();
@@ -186,7 +455,7 @@ public class SilentRankFilters implements PlugInFilter {
     // 'aborted' must not be a class variable because it signals the other threads to stop; and this may be caused
     // by an interrupted preview thread after the main calculation has been started.
     private void doFiltering(final ImageProcessor ip, final int[] lineRadii, final int filterType,
-            final float minMaxOutliersSign, final float threshold, final int colorChannel, final boolean[] aborted) {
+                             final float minMaxOutliersSign, final float threshold, final int colorChannel, final boolean[] aborted) {
         Rectangle roi = ip.getRoi();
         int width = ip.getWidth();
         Object pixels = ip.getPixels();
@@ -201,23 +470,23 @@ public class SilentRankFilters implements PlugInFilter {
         final int cacheHeight = kHeight + (numThreads > 1 ? 2 * numThreads : 0);
         // 'cache' is the input buffer. Each line y in the image is mapped onto cache line y%cacheHeight
         final float[] cache = new float[cacheWidth * cacheHeight];
-        highestYinCache = Math.max(roi.y - kHeight / 2, 0) - 1; //this line+1 will be read into the cache first 
+        highestYinCache = Math.max(roi.y - kHeight / 2, 0) - 1; //this line+1 will be read into the cache first
 
-        final int[] yForThread = new int[numThreads];		//threads announce here which line they currently process
+        final int[] yForThread = new int[numThreads];        //threads announce here which line they currently process
         Arrays.fill(yForThread, -1);
-        yForThread[numThreads - 1] = roi.y - 1;					//first thread started should begin at roi.y
+        yForThread[numThreads - 1] = roi.y - 1;                    //first thread started should begin at roi.y
         //IJ.log("going to filter lines "+roi.y+"-"+(roi.y+roi.height-1)+"; cacheHeight="+cacheHeight);
-        final Thread[] threads = new Thread[numThreads - 1];	//thread number 0 is this one, not in the array
+        final Thread[] threads = new Thread[numThreads - 1];    //thread number 0 is this one, not in the array
         for (int t = numThreads - 1; t > 0; t--) {
             final int ti = t;
             final Thread thread = new Thread(
                     new Runnable() {
-                final public void run() {
-                    doFiltering(ip, lineRadii, cache, cacheWidth, cacheHeight,
-                            filterType, minMaxOutliersSign, threshold, colorChannel,
-                            yForThread, ti, aborted);
-                }
-            },
+                        final public void run() {
+                            doFiltering(ip, lineRadii, cache, cacheWidth, cacheHeight,
+                                    filterType, minMaxOutliersSign, threshold, colorChannel,
+                                    yForThread, ti, aborted);
+                        }
+                    },
                     "RankFilters-" + t);
             thread.setPriority(Thread.currentThread().getPriority());
             thread.start();
@@ -234,7 +503,7 @@ public class SilentRankFilters implements PlugInFilter {
                 }
             } catch (InterruptedException e) {
                 aborted[0] = true;
-                Thread.currentThread().interrupt();	  //keep interrupted status (PlugInFilterRunner needs it)
+                Thread.currentThread().interrupt();      //keep interrupted status (PlugInFilterRunner needs it)
             }
         }
         pass++;
@@ -264,8 +533,8 @@ public class SilentRankFilters implements PlugInFilter {
     // from any pixel in the area. Therfore min or max is calculated; this is a much faster
     // operation than the median.
     private void doFiltering(ImageProcessor ip, int[] lineRadii, float[] cache, int cacheWidth, int cacheHeight,
-            int filterType, float minMaxOutliersSign, float threshold, int colorChannel,
-            int[] yForThread, int threadNumber, boolean[] aborted) {
+                             int filterType, float minMaxOutliersSign, float threshold, int colorChannel,
+                             int[] yForThread, int threadNumber, boolean[] aborted) {
         if (aborted[0] || Thread.currentThread().isInterrupted()) {
             return;
         }
@@ -308,21 +577,21 @@ public class SilentRankFilters implements PlugInFilter {
         boolean rgb = ip instanceof ColorProcessor;
 
         while (!aborted[0]) {
-            int y = arrayMax(yForThread) + 1;		// y of the next line that needs processing
+            int y = arrayMax(yForThread) + 1;        // y of the next line that needs processing
             yForThread[threadNumber] = y;
             //IJ.log("thread "+threadNumber+" @y="+y+" needs"+(y-kHeight/2)+"-"+(y+kHeight/2)+" highestYinC="+highestYinCache);
             boolean threadFinished = y >= roi.y + roi.height;
             if (numThreads > 1 && (threadWaiting || threadFinished)) // 'if' is not synchronized to avoid overhead
             {
                 synchronized (this) {
-                    notifyAll();					// we may have blocked another thread
+                    notifyAll();                    // we may have blocked another thread
                     //IJ.log("thread "+threadNumber+" @y="+y+" notifying");
                 }
             }
             if (threadFinished) {
-                return;								// all done, break the loop
+                return;                                // all done, break the loop
             }
-            if (threadNumber == 0) {					// main thread checks for abort
+            if (threadNumber == 0) {                    // main thread checks for abort
                 long time = System.currentTimeMillis();
                 if (time - lastTime > 100) {
                     lastTime = time;
@@ -342,14 +611,14 @@ public class SilentRankFilters implements PlugInFilter {
             }
             previousY = y;
 
-            if (numThreads > 1) {							// thread synchronization
+            if (numThreads > 1) {                            // thread synchronization
                 int slowestThreadY = arrayMinNonNegative(yForThread); // non-synchronized check to avoid overhead
-                if (y - slowestThreadY + kHeight > cacheHeight) {	// we would overwrite data needed by another thread
+                if (y - slowestThreadY + kHeight > cacheHeight) {    // we would overwrite data needed by another thread
                     synchronized (this) {
                         slowestThreadY = arrayMinNonNegative(yForThread); //recheck whether we have to wait
                         if (y - slowestThreadY + kHeight > cacheHeight) {
                             do {
-                                notifyAll();			// avoid deadlock: wake up others waiting
+                                notifyAll();            // avoid deadlock: wake up others waiting
                                 threadWaiting = true;
                                 //IJ.log("Thread "+threadNumber+" waiting @y="+y+" slowest@y="+slowestThreadY);
                                 try {
@@ -371,7 +640,7 @@ public class SilentRankFilters implements PlugInFilter {
                 }
             }
 
-            if (numThreads == 1) {															// R E A D
+            if (numThreads == 1) {                                                            // R E A D
                 int yStartReading = y == roi.y ? Math.max(roi.y - kHeight / 2, 0) : y + kHeight / 2;
                 for (int yNew = yStartReading; yNew <= y + kHeight / 2; yNew++) { //only 1 line except at start
                     readLineToCacheOrPad(pixels, width, height, roi.y, xminInside, widthInside,
@@ -379,7 +648,7 @@ public class SilentRankFilters implements PlugInFilter {
                 }
             } else if (!copyingToCache || highestYinCache < y + kHeight / 2) {
                 synchronized (cache) {
-                    copyingToCache = true;				// copy new line(s) into cache
+                    copyingToCache = true;                // copy new line(s) into cache
                     while (highestYinCache < arrayMinNonNegative(yForThread) - kHeight / 2 + cacheHeight - 1) {
                         int yNew = highestYinCache + 1;
                         readLineToCacheOrPad(pixels, width, height, roi.y, xminInside, widthInside,
@@ -390,14 +659,14 @@ public class SilentRankFilters implements PlugInFilter {
                 }
             }
 
-            int cacheLineP = cacheWidth * (y % cacheHeight) + kRadius;	//points to pixel (roi.x, y)
+            int cacheLineP = cacheWidth * (y % cacheHeight) + kRadius;    //points to pixel (roi.x, y)
             filterLine(values, width, cache, cachePointers, kNPoints, cacheLineP, roi, y, // F I L T E R
                     sums, medianBuf1, medianBuf2, minMaxOutliersSign, maxValue, isFloat, filterType,
                     smallKernel, sumFilter, minOrMax, minOrMaxOrOutliers, threshold);
             if (!isFloat) //Float images: data are written already during 'filterLine'
             {
-                writeLineToPixels(values, pixels, roi.x + y * width, roi.width, colorChannel);	// W R I T E
-            }			//IJ.log("thread "+threadNumber+" @y="+y+" line done");
+                writeLineToPixels(values, pixels, roi.x + y * width, roi.width, colorChannel);    // W R I T E
+            }            //IJ.log("thread "+threadNumber+" @y="+y+" line done");
         } // while (!aborted[0]); loop over y (lines)
     }
 
@@ -423,15 +692,15 @@ public class SilentRankFilters implements PlugInFilter {
     }
 
     private void filterLine(float[] values, int width, float[] cache, int[] cachePointers, int kNPoints, int cacheLineP, Rectangle roi, int y,
-            double[] sums, float[] medianBuf1, float[] medianBuf2, float minMaxOutliersSign, float maxValue, boolean isFloat, int filterType,
-            boolean smallKernel, boolean sumFilter, boolean minOrMax, boolean minOrMaxOrOutliers, float threshold) {
+                            double[] sums, float[] medianBuf1, float[] medianBuf2, float minMaxOutliersSign, float maxValue, boolean isFloat, int filterType,
+                            boolean smallKernel, boolean sumFilter, boolean minOrMax, boolean minOrMaxOrOutliers, float threshold) {
         int valuesP = isFloat ? roi.x + y * width : 0;
         float max = 0f;
-        float median = Float.isNaN(cache[cacheLineP]) ? 0 : cache[cacheLineP];	// a first guess
+        float median = Float.isNaN(cache[cacheLineP]) ? 0 : cache[cacheLineP];    // a first guess
         boolean fullCalculation = true;
-        for (int x = 0; x < roi.width; x++, valuesP++) {							// x is with respect to roi.x
+        for (int x = 0; x < roi.width; x++, valuesP++) {                            // x is with respect to roi.x
             if (fullCalculation) {
-                fullCalculation = smallKernel;	//for small kernel, always use the full area, not incremental algorithm
+                fullCalculation = smallKernel;    //for small kernel, always use the full area, not incremental algorithm
                 if (minOrMaxOrOutliers) {
                     max = getAreaMax(cache, x, cachePointers, 0, -Float.MAX_VALUE, minMaxOutliersSign);
                 }
@@ -477,282 +746,21 @@ public class SilentRankFilters implements PlugInFilter {
                 values[valuesP] = median;
             } else if (filterType == OUTLIERS) {
                 float v = cache[cacheLineP + x];
-                if (v * minMaxOutliersSign + threshold < max) {		//for low outliers: median can't be higher than max (minMaxOutliersSign is +1)
+                if (v * minMaxOutliersSign + threshold < max) {        //for low outliers: median can't be higher than max (minMaxOutliersSign is +1)
                     median = getMedian(cache, x, cachePointers, medianBuf1, medianBuf2, kNPoints, median);
                     if (v * minMaxOutliersSign + threshold < median * minMaxOutliersSign) {
-                        v = median;					//beyond threshold (below if minMaxOutliersSign=+1), replace outlier by median
+                        v = median;                    //beyond threshold (below if minMaxOutliersSign=+1), replace outlier by median
                     }
                 }
                 values[valuesP] = v;
-            } else if (filterType == REMOVE_NAN) {	 //float only; then 'values' is pixels array
+            } else if (filterType == REMOVE_NAN) {     //float only; then 'values' is pixels array
                 if (Float.isNaN(values[valuesP])) {
                     values[valuesP] = getNaNAwareMedian(cache, x, cachePointers, medianBuf1, medianBuf2, kNPoints, median);
                 } else {
-                    median = values[valuesP];	//initial guess for the next point
+                    median = values[valuesP];    //initial guess for the next point
                 }
             }
         } // for x
-    }
-
-    /**
-     * Read a line into the cache (including padding in x). If y>=height, instead of reading new data, it duplicates the
-     * line y=height-1. If y==0, it also creates the data for y<0, as far as necessary, thus filling the cache with more
-     * than one line (padding by duplicating the y=0 row).
-     */
-    private static void readLineToCacheOrPad(Object pixels, int width, int height, int roiY, int xminInside, int widthInside,
-            float[] cache, int cacheWidth, int cacheHeight, int padLeft, int padRight, int colorChannel,
-            int kHeight, int y) {
-        int lineInCache = y % cacheHeight;
-        if (y < height) {
-            readLineToCache(pixels, y * width, xminInside, widthInside,
-                    cache, lineInCache * cacheWidth, padLeft, padRight, colorChannel);
-            if (y == 0) {
-                for (int prevY = roiY - kHeight / 2; prevY < 0; prevY++) {	//for y<0, pad with y=0 border pixels 
-                    int prevLineInCache = cacheHeight + prevY;
-                    System.arraycopy(cache, 0, cache, prevLineInCache * cacheWidth, cacheWidth);
-                }
-            }
-        } else {
-            System.arraycopy(cache, cacheWidth * ((height - 1) % cacheHeight), cache, lineInCache * cacheWidth, cacheWidth);
-        }
-    }
-
-    /**
-     * Read a line into the cache (includes conversion to flaot). Pad with edge pixels in x if necessary
-     */
-    private static void readLineToCache(Object pixels, int pixelLineP, int xminInside, int widthInside,
-            float[] cache, int cacheLineP, int padLeft, int padRight, int colorChannel) {
-        if (pixels instanceof byte[]) {
-            byte[] bPixels = (byte[]) pixels;
-            for (int pp = pixelLineP + xminInside, cp = cacheLineP + padLeft; pp < pixelLineP + xminInside + widthInside; pp++, cp++) {
-                cache[cp] = bPixels[pp] & 0xff;
-            }
-        } else if (pixels instanceof short[]) {
-            short[] sPixels = (short[]) pixels;
-            for (int pp = pixelLineP + xminInside, cp = cacheLineP + padLeft; pp < pixelLineP + xminInside + widthInside; pp++, cp++) {
-                cache[cp] = sPixels[pp] & 0xffff;
-            }
-        } else if (pixels instanceof float[]) {
-            System.arraycopy(pixels, pixelLineP + xminInside, cache, cacheLineP + padLeft, widthInside);
-        } else {	//RGB
-            int[] cPixels = (int[]) pixels;
-            int shift = 16 - 8 * colorChannel;
-            int byteMask = 255 << shift;
-            for (int pp = pixelLineP + xminInside, cp = cacheLineP + padLeft; pp < pixelLineP + xminInside + widthInside; pp++, cp++) {
-                cache[cp] = (cPixels[pp] & byteMask) >> shift;
-            }
-        }
-        for (int cp = cacheLineP; cp < cacheLineP + padLeft; cp++) {
-            cache[cp] = cache[cacheLineP + padLeft];
-        }
-        for (int cp = cacheLineP + padLeft + widthInside; cp < cacheLineP + padLeft + widthInside + padRight; cp++) {
-            cache[cp] = cache[cacheLineP + padLeft + widthInside - 1];
-        }
-    }
-
-    /**
-     * Write a line to pixels arrax, converting from float (not for float data!) No checking for overflow/underflow
-     */
-    private static void writeLineToPixels(float[] values, Object pixels, int pixelP, int length, int colorChannel) {
-        if (pixels instanceof byte[]) {
-            byte[] bPixels = (byte[]) pixels;
-            for (int i = 0, p = pixelP; i < length; i++, p++) {
-                bPixels[p] = (byte) (((int) (values[i] + 0.5f)) & 0xff);
-            }
-        } else if (pixels instanceof short[]) {
-            short[] sPixels = (short[]) pixels;
-            for (int i = 0, p = pixelP; i < length; i++, p++) {
-                sPixels[p] = (short) (((int) (values[i] + 0.5f)) & 0xffff);
-            }
-        } else {	//RGB
-            int[] cPixels = (int[]) pixels;
-            int shift = 16 - 8 * colorChannel;
-            int resetMask = 0xffffffff ^ (0xff << shift);
-            for (int i = 0, p = pixelP; i < length; i++, p++) {
-                cPixels[p] = (cPixels[p] & resetMask) | (((int) (values[i] + 0.5f)) << shift);
-            }
-        }
-    }
-
-    /**
-     * Get max (or -min if sign=-1) within the kernel area.
-     *
-     * @param x between 0 and cacheWidth-1
-     * @param ignoreRight should be 0 for analyzing all data or 1 for leaving out the row at the right
-     * @param max should be -Float.MAX_VALUE or the smallest value the maximum can be
-     */
-    private static float getAreaMax(float[] cache, int xCache0, int[] kernel, int ignoreRight, float max, float sign) {
-        for (int kk = 0; kk < kernel.length; kk++) {	// y within the cache stripe (we have 2 kernel pointers per cache line)
-            for (int p = kernel[kk++] + xCache0; p <= kernel[kk] + xCache0 - ignoreRight; p++) {
-                float v = cache[p] * sign;
-                if (max < v) {
-                    max = v;
-                }
-            }
-        }
-        return max;
-    }
-
-    /**
-     * Get max (or -min if sign=-1) at the right border inside or left border outside the kernel area. x between 0 and
-     * cacheWidth-1
-     */
-    private static float getSideMax(float[] cache, int xCache0, int[] kernel, boolean isRight, float sign) {
-        float max = -Float.MAX_VALUE;
-        if (!isRight) {
-            xCache0--;
-        }
-        for (int kk = isRight ? 1 : 0; kk < kernel.length; kk += 2) {	// y within the cache stripe (we have 2 kernel pointers per cache line)
-            float v = cache[xCache0 + kernel[kk]] * sign;
-            if (max < v) {
-                max = v;
-            }
-        }
-        return max;
-    }
-
-    /**
-     * Get sum of values and values squared within the kernel area. x between 0 and cacheWidth-1 Output is written to
-     * array sums[0] = sum; sums[1] = sum of squares
-     */
-    private static void getAreaSums(float[] cache, int xCache0, int[] kernel, double[] sums) {
-        double sum = 0, sum2 = 0;
-        for (int kk = 0; kk < kernel.length; kk++) {	// y within the cache stripe (we have 2 kernel pointers per cache line)
-            for (int p = kernel[kk++] + xCache0; p <= kernel[kk] + xCache0; p++) {
-                float v = cache[p];
-                sum += v;
-                sum2 += v * v;
-            }
-        }
-        sums[0] = sum;
-        sums[1] = sum2;
-        return;
-    }
-
-    /**
-     * Add all values and values squared at the right border inside minus at the left border outside the kernal area.
-     * Output is added or subtracted to/from array sums[0] += sum; sums[1] += sum of squares when at the right border,
-     * minus when at the left border
-     */
-    private static void addSideSums(float[] cache, int xCache0, int[] kernel, double[] sums) {
-        double sum = 0, sum2 = 0;
-        for (int kk = 0; kk < kernel.length; /*k++;k++ below*/) {
-            float v = cache[kernel[kk++] + (xCache0 - 1)];
-            sum -= v;
-            sum2 -= v * v;
-            v = cache[kernel[kk++] + xCache0];
-            sum += v;
-            sum2 += v * v;
-        }
-        sums[0] += sum;
-        sums[1] += sum2;
-        return;
-    }
-
-    /**
-     * Get median of values within kernel-sized neighborhood. Kernel size kNPoints should be odd.
-     */
-    private static float getMedian(float[] cache, int xCache0, int[] kernel,
-            float[] aboveBuf, float[] belowBuf, int kNPoints, float guess) {
-        int nAbove = 0, nBelow = 0;
-        for (int kk = 0; kk < kernel.length; kk++) {
-            for (int p = kernel[kk++] + xCache0; p <= kernel[kk] + xCache0; p++) {
-                float v = cache[p];
-                if (v > guess) {
-                    aboveBuf[nAbove] = v;
-                    nAbove++;
-                } else if (v < guess) {
-                    belowBuf[nBelow] = v;
-                    nBelow++;
-                }
-            }
-        }
-        int half = kNPoints / 2;
-        if (nAbove > half) {
-            return findNthLowestNumber(aboveBuf, nAbove, nAbove - half - 1);
-        } else if (nBelow > half) {
-            return findNthLowestNumber(belowBuf, nBelow, half);
-        } else {
-            return guess;
-        }
-    }
-
-    /**
-     * Get median of values within kernel-sized neighborhood. NaN data values are ignored; the output is NaN only if
-     * there are only NaN values in the kernel-sized neighborhood
-     */
-    private static float getNaNAwareMedian(float[] cache, int xCache0, int[] kernel,
-            float[] aboveBuf, float[] belowBuf, int kNPoints, float guess) {
-        int nAbove = 0, nBelow = 0;
-        for (int kk = 0; kk < kernel.length; kk++) {
-            for (int p = kernel[kk++] + xCache0; p <= kernel[kk] + xCache0; p++) {
-                float v = cache[p];
-                if (Float.isNaN(v)) {
-                    kNPoints--;
-                } else if (v > guess) {
-                    aboveBuf[nAbove] = v;
-                    nAbove++;
-                } else if (v < guess) {
-                    belowBuf[nBelow] = v;
-                    nBelow++;
-                }
-            }
-        }
-        if (kNPoints == 0) {
-            return Float.NaN;	//only NaN data in the neighborhood?
-        }
-        int half = kNPoints / 2;
-        if (nAbove > half) {
-            return findNthLowestNumber(aboveBuf, nAbove, nAbove - half - 1);
-        } else if (nBelow > half) {
-            return findNthLowestNumber(belowBuf, nBelow, half);
-        } else {
-            return guess;
-        }
-    }
-
-    /**
-     * Find the n-th lowest number in part of an array
-     *
-     * @param buf The input array. Only values 0 ... bufLength are read. <code>buf</code> will be modified.
-     * @param bufLength Number of values in <code>buf</code> that should be read
-     * @param n which value should be found; n=0 for the lowest, n=bufLength-1 for the highest
-     * @return the value
-     */
-    public final static float findNthLowestNumber(float[] buf, int bufLength, int n) {
-        // Hoare's find, algorithm, based on http://www.geocities.com/zabrodskyvlada/3alg.html
-        // Contributed by Heinz Klar
-        int i, j;
-        int l = 0;
-        int m = bufLength - 1;
-        float med = buf[n];
-        float dum;
-
-        while (l < m) {
-            i = l;
-            j = m;
-            do {
-                while (buf[i] < med) {
-                    i++;
-                }
-                while (med < buf[j]) {
-                    j--;
-                }
-                dum = buf[j];
-                buf[j] = buf[i];
-                buf[i] = dum;
-                i++;
-                j--;
-            } while ((j >= n) && (i <= n));
-            if (j < n) {
-                l = i;
-            }
-            if (n < i) {
-                m = j;
-            }
-            med = buf[n];
-        }
-        return med;
     }
 
     /**
@@ -791,7 +799,7 @@ public class SilentRankFilters implements PlugInFilter {
      * Create a circular kernel (structuring element) of a given radius.
      *
      * @param radius Radius = 0.5 includes the 4 neighbors of the pixel in the center, radius = 1 corresponds to a 3x3
-     * kernel size.
+     *               kernel size.
      * @return the circular kernel The output is an array that gives the length of each line of the structuring element
      * (kernel) to the left (negative) and to the right (positive): [0] left in line 0, [1] right in line 0, [2] left in
      * line 2, ... The maximum (absolute) value should be kernelRadius. Array elements at the end: length-2: nPoints,
@@ -814,13 +822,13 @@ public class SilentRankFilters implements PlugInFilter {
         kernel[2 * kRadius] = -kRadius;
         kernel[2 * kRadius + 1] = kRadius;
         int nPoints = 2 * kRadius + 1;
-        for (int y = 1; y <= kRadius; y++) {		//lines above and below center together
+        for (int y = 1; y <= kRadius; y++) {        //lines above and below center together
             int dx = (int) (Math.sqrt(r2 - y * y + 1e-10));
             kernel[2 * (kRadius - y)] = -dx;
             kernel[2 * (kRadius - y) + 1] = dx;
             kernel[2 * (kRadius + y)] = -dx;
             kernel[2 * (kRadius + y) + 1] = dx;
-            nPoints += 4 * dx + 2;	//2*dx+1 for each line, above&below
+            nPoints += 4 * dx + 2;    //2*dx+1 for each line, above&below
         }
         kernel[kernel.length - 2] = nPoints;
         kernel[kernel.length - 1] = kRadius;

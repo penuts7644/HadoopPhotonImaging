@@ -2,7 +2,7 @@
 
 ---------------------
 
-### What is this repository for? ###
+### About this project ###
 
 * Authors: Lonneke Scheffer & Wout van Helvoirt
 * Version: 1.0
@@ -11,14 +11,14 @@ single photon event data, by locating the center point of each photon. The reduc
 from the mappers into one 16-bit greyscale image. Each pixel contains the amount of found photons and are mapped to the
 correct pixel value.
 
-### How do I get set up? ###
+### Getting set up ###
 
 * You need a Hadoop enabled cluster and a Hadoop client from which you can run this program. More information about
 Hadoop can be found [Here](http://hadoop.apache.org).
 * This software requires at least [Java 7](https://www.oracle.com/downloads/index.html) to function.
-* The source has been written in IntelliJ IDEA 2016.
+* The source has been written in IntelliJ IDEA 2016 and the project uses Maven for package management.
 
-### How do I use this application? ###
+### How to use this application ###
 
 The jar file can be run via the Hadoop client's command-line. With the command below, you can run the program.
 
@@ -40,10 +40,21 @@ The command consists out of:
 * Optional: Set the noise tolerance (tolerance). Default value is '100'.
 * Optional: Enable preprocessing (preprocessing), 'true' or 'false'. Default value is 'true'.
 
+### Our use case ###
+
+We used 300000 small tiff files of about 650 Kb each. We first created a plugin for ImageJ to process these images,
+which was able to process all the files within 40 minutes on one Intel Core i7 chip. The Hadoop version creates a mapper
+for each input file and is able to process one tenth of all the files, within 40 minutes. The cluster had 71 operating 8
+core nodes available for this job.
+
+So why does it take so long process the files on the cluster? As said, the files are very small and each file is
+probably processed within a few seconds. If one mapper could receive multiple files, the efficiency could be improved
+a lot.
+
 ### Future idea's ###
 
 * Look into removing Sorting option.
 * User definable, amount of images to be processed by one mapper.
-* Looking into image processing interface's like [HIPI](http://hipi.cs.virginia.edu), which could greatly improve
+* Looking into a image processing interface's like [HIPI](http://hipi.cs.virginia.edu), which could greatly improve
 efficiency of storing the image files on the HDFS as well as the creation of the splits/readers, mapping and reducing
 stage.

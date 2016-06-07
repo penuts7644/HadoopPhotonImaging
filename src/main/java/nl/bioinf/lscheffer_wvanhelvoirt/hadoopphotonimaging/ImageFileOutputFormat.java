@@ -20,11 +20,11 @@ import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
 import java.io.IOException;
 
 /**
  * ImageFileOutputFormat
- *
  * This is a custom OutputFormat class for image files.
  *
  * @author Lonneke Scheffer and Wout van Helvoirt

@@ -18,22 +18,26 @@ package nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhotonImaging;
 
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Writable;
+
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
 /**
  * IntTwoDArrayWritable
- *
  * A Custom Writable class based on the TwoDArrayWritable, but uses IntWritable's instead of Writable's.
  *
  * @author Lonneke Scheffer and Wout van Helvoirt
  */
 public class IntTwoDArrayWritable implements Writable {
 
-    /** The class type. */
+    /**
+     * The class type.
+     */
     private final Class valueClass;
-    /** A IntWritable two D array to be used internally. */
+    /**
+     * A IntWritable two D array to be used internally.
+     */
     private IntWritable[][] values;
 
     /**
@@ -56,7 +60,7 @@ public class IntTwoDArrayWritable implements Writable {
      * Constructor which sets the class being used as well a the data in the two D array.
      *
      * @param valueClass The class type used for internal structure.
-     * @param values The IntWritable two D array input data.
+     * @param values     The IntWritable two D array input data.
      */
     public IntTwoDArrayWritable(Class valueClass, IntWritable[][] values) {
         this(valueClass);
@@ -68,13 +72,18 @@ public class IntTwoDArrayWritable implements Writable {
      *
      * @param values The IntWritable two D array input data.
      */
-    public void set(IntWritable[][] values) { this.values = values; }
+    public void set(IntWritable[][] values) {
+        this.values = values;
+    }
 
     /**
      * Returns the current IntWritable two D array data.
+     *
      * @return IntWritable two D array data currently in this Writable.
      */
-    public IntWritable[][] get() { return this.values; }
+    public IntWritable[][] get() {
+        return this.values;
+    }
 
     /**
      * Method that reads the fields in this custom Writable to be used after serialization.

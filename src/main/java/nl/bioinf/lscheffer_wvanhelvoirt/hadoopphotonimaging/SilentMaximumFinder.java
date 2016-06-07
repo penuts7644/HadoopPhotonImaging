@@ -1,12 +1,24 @@
 package nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhotonImaging;
-import ij.plugin.filter.*;
+
 import ij.*;
-import ij.gui.*;
-import ij.measure.*;
-import ij.process.*;
+import ij.gui.PointRoi;
+import ij.gui.PolygonRoi;
+import ij.gui.Roi;
+import ij.gui.Wand;
+import ij.measure.Calibration;
+import ij.measure.Measurements;
+import ij.measure.ResultsTable;
+import ij.plugin.filter.Analyzer;
+import ij.plugin.filter.MaximumFinder;
+import ij.plugin.filter.PlugInFilter;
+import ij.process.ByteProcessor;
+import ij.process.FloatProcessor;
+import ij.process.ImageProcessor;
 import ij.util.Tools;
+
 import java.awt.*;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Vector;
 
 /**
  * This ImageJ plug-in filter finds the maxima (or minima) of an image. It can create a mask where the local maxima of
@@ -14,13 +26,10 @@ import java.util.*;
  * Assume a landscape of inverted heights, i.e., maxima of the image are now water sinks. For each point in the image,
  * the sink that the water goes to determines which particle it belongs to. When finding maxima (not minima), pixels
  * with a level below the lower threshold can be left unprocessed.
- *
  * Except for segmentation, this plugin works with ROIs, including non-rectangular ROIs. Since this plug-in creates a
  * separate output image it processes only single images or slices, no stacks.
- *
  * Notes: - When using one instance of MaximumFinder for more than one image in parallel threads, all must images have
  * the same width and height.
- *
  * version 09-Nov-2006 Michael Schmid version 21-Nov-2006 Wayne Rasband. Adds "Display Point Selection" option and
  * "Count" output type. version 28-May-2007 Michael Schmid. Preview added, bugfix: minima of calibrated images, uses
  * Arrays.sort version 07-Aug-2007 Fixed a bug that could delete particles when doing watershed segmentation of an EDM.
@@ -35,10 +44,6 @@ import java.util.*;
 public class SilentMaximumFinder implements PlugInFilter {
 
     //filter params
-    /**
-     * maximum height difference between points that are not counted as separate maxima
-     */
-    private static double tolerance = 10;
     /**
      * Output type single points
      */
@@ -64,6 +69,31 @@ public class SilentMaximumFinder implements PlugInFilter {
      */
     public final static int COUNT = 5;
     /**
+     * output type names
+     */
+    final static String[] outputTypeNames = new String[]{"Single Points", "Maxima Within Tolerance", "Segmented Particles", "Point Selection", "List", "Count"};
+    final static int[] DIR_X_OFFSET = new int[]{0, 1, 1, 1, 0, -1, -1, -1};
+    final static int[] DIR_Y_OFFSET = new int[]{-1, -1, 0, 1, 1, 1, 0, -1};
+    /**
+     * the following constants are used to set bits corresponding to pixel types
+     */
+    final static byte MAXIMUM = (byte) 1;            // marks local maxima (irrespective of noise tolerance)
+    final static byte LISTED = (byte) 2;             // marks points currently in the list
+    final static byte PROCESSED = (byte) 4;          // marks points processed previously
+    final static byte MAX_AREA = (byte) 8;           // marks areas near a maximum, within the tolerance
+    final static byte EQUAL = (byte) 16;             // marks contigous maximum points of equal level
+    final static byte MAX_POINT = (byte) 32;         // marks a single point standing for a maximum
+    final static byte ELIMINATED = (byte) 64;        // marks maxima that have been eliminated before watershed
+    /**
+     * type masks corresponding to the output types
+     */
+    final static byte[] outputTypeMasks = new byte[]{MAX_POINT, MAX_AREA, MAX_AREA};
+    final static float SQRT2 = 1.4142135624f;
+    /**
+     * maximum height difference between points that are not counted as separate maxima
+     */
+    private static double tolerance = 10;
+    /**
      * what type of output to create (see constants above)
      */
     private static int outputType = POINT_SELECTION;
@@ -71,10 +101,6 @@ public class SilentMaximumFinder implements PlugInFilter {
      * what type of output to create was chosen in the dialog (see constants above)
      */
     private static int dialogOutputType = POINT_SELECTION;
-    /**
-     * output type names
-     */
-    final static String[] outputTypeNames = new String[]{"Single Points", "Maxima Within Tolerance", "Segmented Particles", "Point Selection", "List", "Count"};
     /**
      * whether to exclude maxima at the edge of the image
      */
@@ -95,7 +121,7 @@ public class SilentMaximumFinder implements PlugInFilter {
     private Vector checkboxes;                   // a reference to the Checkboxes of the dialog
     private boolean thresholdWarningShown = false;  // whether the warning "can't find minima with thresholding" has been shown
     private Label messageArea;                  // reference to the textmessage area for displaying the number of maxima
-//    private double    progressDone;                 // for progress bar, fraction of work done so far
+    //    private double    progressDone;                 // for progress bar, fraction of work done so far
 //    private int       nPasses = 0;                  // for progress bar, how many images to process (sequentially or parallel threads)
     //the following are class variables for having shorter argument lists
     private int width, height;                // image dimensions
@@ -107,127 +133,15 @@ public class SilentMaximumFinder implements PlugInFilter {
      */
     private int[] dirOffset;                    // pixel offsets of neighbor pixels for direct addressing
     private Polygon points;                    // maxima found by findMaxima() when outputType is POINT_SELECTION
-    final static int[] DIR_X_OFFSET = new int[]{0, 1, 1, 1, 0, -1, -1, -1};
-    final static int[] DIR_Y_OFFSET = new int[]{-1, -1, 0, 1, 1, 1, 0, -1};
-    /**
-     * the following constants are used to set bits corresponding to pixel types
-     */
-    final static byte MAXIMUM = (byte) 1;            // marks local maxima (irrespective of noise tolerance)
-    final static byte LISTED = (byte) 2;             // marks points currently in the list
-    final static byte PROCESSED = (byte) 4;          // marks points processed previously
-    final static byte MAX_AREA = (byte) 8;           // marks areas near a maximum, within the tolerance
-    final static byte EQUAL = (byte) 16;             // marks contigous maximum points of equal level
-    final static byte MAX_POINT = (byte) 32;         // marks a single point standing for a maximum
-    final static byte ELIMINATED = (byte) 64;        // marks maxima that have been eliminated before watershed
-    /**
-     * type masks corresponding to the output types
-     */
-    final static byte[] outputTypeMasks = new byte[]{MAX_POINT, MAX_AREA, MAX_AREA};
-    final static float SQRT2 = 1.4142135624f;
-
-    /**
-     * Method to return types supported
-     *
-     * @param arg Not used by this plugin-filter
-     * @param imp The image to be filtered
-     * @return Code describing supported formats etc.
-     */
-    public int setup(String arg, ImagePlus imp) {
-        this.imp = imp;
-        return flags;
-    }
-
-    /**
-     * The plugin is inferred from ImageJ by this method
-     *
-     * @param ip The image where maxima (or minima) should be found
-     */
-    public void run(ImageProcessor ip) {
-        Roi roi = imp.getRoi();
-        if (outputType == POINT_SELECTION && !roiSaved) {
-            imp.saveRoi(); // save previous selection so user can restore it
-            roiSaved = true;
-        }
-        if (roi != null && (!roi.isArea() || outputType == SEGMENTED)) {
-            imp.deleteRoi();
-            roi = null;
-        }
-        boolean invertedLut = imp.isInvertedLut();
-        double threshold = useMinThreshold ? ip.getMinThreshold() : ImageProcessor.NO_THRESHOLD;
-        if ((invertedLut && !lightBackground) || (!invertedLut && lightBackground)) {
-            threshold = ImageProcessor.NO_THRESHOLD;    //don't care about threshold when finding minima
-            float[] cTable = ip.getCalibrationTable();
-            ip = ip.duplicate();
-            if (cTable == null) {                 //invert image for finding minima of uncalibrated images
-                ip.invert();
-            } else {                            //we are using getPixelValue, so the CalibrationTable must be inverted
-                float[] invertedCTable = new float[cTable.length];
-                for (int i = cTable.length - 1; i >= 0; i--) {
-                    invertedCTable[i] = -cTable[i];
-                }
-                ip.setCalibrationTable(invertedCTable);
-            }
-            ip.setRoi(roi);
-        }
-        ByteProcessor outIp = null;
-        outIp = findMaxima(ip, tolerance, threshold, outputType, excludeOnEdges, false); //process the image
-        if (outIp == null) {
-            return;              //cancelled by user or previewing or no output image
-        }
-        if (!Prefs.blackBackground) //normally, output has an inverted LUT, "active" pixels black (255) - like a mask
-        {
-            outIp.invertLut();
-        }
-        String resultName;
-        if (outputType == SEGMENTED) //Segmentation required
-        {
-            resultName = " Segmented";
-        } else {
-            resultName = " Maxima";
-        }
-        String outname = imp.getTitle();
-        if (imp.getNSlices() > 1) {
-            outname += "(" + imp.getCurrentSlice() + ")";
-        }
-        outname += resultName;
-        if (WindowManager.getImage(outname) != null) {
-            outname = WindowManager.getUniqueName(outname);
-        }
-        ImagePlus maxImp = new ImagePlus(outname, outIp);
-        Calibration cal = imp.getCalibration().copy();
-        cal.disableDensityCalibration();
-        maxImp.setCalibration(cal);             //keep the spatial calibration
-        maxImp.show();
-    } //public void run
-
-    /**
-     * Finds the image maxima and returns them as a Polygon. There is an example at
-     * http://imagej.nih.gov/ij/macros/js/FindMaxima.js.
-     *
-     * @param ip The input image
-     * @param tolerance Height tolerance: maxima are accepted only if protruding more than this value from the ridge to
-     * a higher maximum
-     * @param excludeOnEdges Whether to exclude edge maxima
-     * @return A Polygon containing the coordinates of the maxima
-     */
-    public Polygon getMaxima(ImageProcessor ip, double tolerance, boolean excludeOnEdges) {
-        findMaxima(ip, tolerance, ImageProcessor.NO_THRESHOLD,
-                MaximumFinder.POINT_SELECTION, excludeOnEdges, false);
-        if (points == null) {
-            return new Polygon();
-        } else {
-            return points;
-        }
-    }
 
     /**
      * Calculates peak positions of 1D array N.Vischer, 13-sep-2013
      *
-     * @param xx Array containing peaks.
-     * @param tolerance Depth of a qualified valley must exceed tolerance. Tolerance must be >= 0. Flat tops are marked
-     * at their centers.
+     * @param xx             Array containing peaks.
+     * @param tolerance      Depth of a qualified valley must exceed tolerance. Tolerance must be >= 0. Flat tops are marked
+     *                       at their centers.
      * @param excludeOnEdges If 'true', a peak is only accepted if it is separated by two qualified valleys. If 'false',
-     * a peak is also accepted if separated by one qualified valley and by a border.
+     *                       a peak is also accepted if separated by one qualified valley and by a border.
      * @return Positions of peaks, sorted with decreasing amplitude
      */
     public static int[] findMaxima(double[] xx, double tolerance, boolean excludeOnEdges) {
@@ -317,13 +231,108 @@ public class SilentMaximumFinder implements PlugInFilter {
     }
 
     /**
+     * Method to return types supported
+     *
+     * @param arg Not used by this plugin-filter
+     * @param imp The image to be filtered
+     * @return Code describing supported formats etc.
+     */
+    public int setup(String arg, ImagePlus imp) {
+        this.imp = imp;
+        return flags;
+    }
+
+    /**
+     * The plugin is inferred from ImageJ by this method
+     *
+     * @param ip The image where maxima (or minima) should be found
+     */
+    public void run(ImageProcessor ip) {
+        Roi roi = imp.getRoi();
+        if (outputType == POINT_SELECTION && !roiSaved) {
+            imp.saveRoi(); // save previous selection so user can restore it
+            roiSaved = true;
+        }
+        if (roi != null && (!roi.isArea() || outputType == SEGMENTED)) {
+            imp.deleteRoi();
+            roi = null;
+        }
+        boolean invertedLut = imp.isInvertedLut();
+        double threshold = useMinThreshold ? ip.getMinThreshold() : ImageProcessor.NO_THRESHOLD;
+        if ((invertedLut && !lightBackground) || (!invertedLut && lightBackground)) {
+            threshold = ImageProcessor.NO_THRESHOLD;    //don't care about threshold when finding minima
+            float[] cTable = ip.getCalibrationTable();
+            ip = ip.duplicate();
+            if (cTable == null) {                 //invert image for finding minima of uncalibrated images
+                ip.invert();
+            } else {                            //we are using getPixelValue, so the CalibrationTable must be inverted
+                float[] invertedCTable = new float[cTable.length];
+                for (int i = cTable.length - 1; i >= 0; i--) {
+                    invertedCTable[i] = -cTable[i];
+                }
+                ip.setCalibrationTable(invertedCTable);
+            }
+            ip.setRoi(roi);
+        }
+        ByteProcessor outIp = null;
+        outIp = findMaxima(ip, tolerance, threshold, outputType, excludeOnEdges, false); //process the image
+        if (outIp == null) {
+            return;              //cancelled by user or previewing or no output image
+        }
+        if (!Prefs.blackBackground) //normally, output has an inverted LUT, "active" pixels black (255) - like a mask
+        {
+            outIp.invertLut();
+        }
+        String resultName;
+        if (outputType == SEGMENTED) //Segmentation required
+        {
+            resultName = " Segmented";
+        } else {
+            resultName = " Maxima";
+        }
+        String outname = imp.getTitle();
+        if (imp.getNSlices() > 1) {
+            outname += "(" + imp.getCurrentSlice() + ")";
+        }
+        outname += resultName;
+        if (WindowManager.getImage(outname) != null) {
+            outname = WindowManager.getUniqueName(outname);
+        }
+        ImagePlus maxImp = new ImagePlus(outname, outIp);
+        Calibration cal = imp.getCalibration().copy();
+        cal.disableDensityCalibration();
+        maxImp.setCalibration(cal);             //keep the spatial calibration
+        maxImp.show();
+    } //public void run
+
+    /**
+     * Finds the image maxima and returns them as a Polygon. There is an example at
+     * http://imagej.nih.gov/ij/macros/js/FindMaxima.js.
+     *
+     * @param ip             The input image
+     * @param tolerance      Height tolerance: maxima are accepted only if protruding more than this value from the ridge to
+     *                       a higher maximum
+     * @param excludeOnEdges Whether to exclude edge maxima
+     * @return A Polygon containing the coordinates of the maxima
+     */
+    public Polygon getMaxima(ImageProcessor ip, double tolerance, boolean excludeOnEdges) {
+        findMaxima(ip, tolerance, ImageProcessor.NO_THRESHOLD,
+                MaximumFinder.POINT_SELECTION, excludeOnEdges, false);
+        if (points == null) {
+            return new Polygon();
+        } else {
+            return points;
+        }
+    }
+
+    /**
      * Find the maxima of an image.
      *
-     * @param ip The input image
-     * @param tolerance Height tolerance: maxima are accepted only if protruding more than this value from the ridge to
-     * a higher maximum
-     * @param outputType What to mark in output image: SINGLE_POINTS, IN_TOLERANCE or SEGMENTED. No output image is
-     * created for output types POINT_SELECTION, LIST and COUNT.
+     * @param ip             The input image
+     * @param tolerance      Height tolerance: maxima are accepted only if protruding more than this value from the ridge to
+     *                       a higher maximum
+     * @param outputType     What to mark in output image: SINGLE_POINTS, IN_TOLERANCE or SEGMENTED. No output image is
+     *                       created for output types POINT_SELECTION, LIST and COUNT.
      * @param excludeOnEdges Whether to exclude edge maxima
      * @return A new byteProcessor with a normal (uninverted) LUT where the marked points are set to 255 (Background 0).
      * Pixels outside of the roi of the input ip are not set. Returns null if outputType does not require an output or
@@ -335,25 +344,25 @@ public class SilentMaximumFinder implements PlugInFilter {
 
     /**
      * Here the processing is done: Find the maxima of an image (does not find minima).
-     *
+     * <p>
      * LIMITATIONS: With outputType=SEGMENTED (watershed segmentation), some segmentation lines may be improperly placed
      * if local maxima are suppressed by the tolerance.
      *
-     * @param ip The input image
-     * @param tolerance Height tolerance: maxima are accepted only if protruding more than this value from the ridge to
-     * a higher maximum
-     * @param threshold minimum height of a maximum (uncalibrated); for no minimum height set it to
-     * ImageProcessor.NO_THRESHOLD
-     * @param outputType What to mark in output image: SINGLE_POINTS, IN_TOLERANCE or SEGMENTED. No output image is
-     * created for output types POINT_SELECTION, LIST and COUNT.
+     * @param ip             The input image
+     * @param tolerance      Height tolerance: maxima are accepted only if protruding more than this value from the ridge to
+     *                       a higher maximum
+     * @param threshold      minimum height of a maximum (uncalibrated); for no minimum height set it to
+     *                       ImageProcessor.NO_THRESHOLD
+     * @param outputType     What to mark in output image: SINGLE_POINTS, IN_TOLERANCE or SEGMENTED. No output image is
+     *                       created for output types POINT_SELECTION, LIST and COUNT.
      * @param excludeOnEdges Whether to exclude edge maxima
-     * @param isEDM Whether the image is a float Euclidian Distance Map.
+     * @param isEDM          Whether the image is a float Euclidian Distance Map.
      * @return A new byteProcessor with a normal (uninverted) LUT where the marked points are set to 255 (Background 0).
      * Pixels outside of the roi of the input ip are not set. Returns null if outputType does not require an output or
      * if cancelled by escape
      */
     public ByteProcessor findMaxima(ImageProcessor ip, double tolerance, double threshold,
-            int outputType, boolean excludeOnEdges, boolean isEDM) {
+                                    int outputType, boolean excludeOnEdges, boolean isEDM) {
         if (dirOffset == null) {
             makeDirectionOffsets(ip);
         }
@@ -448,20 +457,20 @@ public class SilentMaximumFinder implements PlugInFilter {
     /**
      * Find all local maxima (irrespective whether they finally qualify as maxima or not)
      *
-     * @param ip The image to be analyzed
-     * @param typeP A byte image, same size as ip, where the maximum points are marked as MAXIMUM (do not use it as
-     * output: for rois, the points are shifted w.r.t. the input image)
+     * @param ip              The image to be analyzed
+     * @param typeP           A byte image, same size as ip, where the maximum points are marked as MAXIMUM (do not use it as
+     *                        output: for rois, the points are shifted w.r.t. the input image)
      * @param excludeEdgesNow Whether to exclude edge pixels
-     * @param isEDM Whether ip is a float Euclidian distance map
-     * @param globalMin The minimum value of the image or roi
-     * @param threshold The threshold (calibrated) below which no pixels are processed. Ignored if
-     * ImageProcessor.NO_THRESHOLD
+     * @param isEDM           Whether ip is a float Euclidian distance map
+     * @param globalMin       The minimum value of the image or roi
+     * @param threshold       The threshold (calibrated) below which no pixels are processed. Ignored if
+     *                        ImageProcessor.NO_THRESHOLD
      * @return Maxima sorted by value. In each array element (long, i.e., 64-bit integer), the value is encoded in the
      * upper 32 bits and the pixel offset in the lower 32 bit Note: Do not use the positions of the points marked as
      * MAXIMUM in typeP, they are invalid for images with a roi.
      */
     long[] getSortedMaxPoints(ImageProcessor ip, ByteProcessor typeP, boolean excludeEdgesNow,
-            boolean isEDM, float globalMin, float globalMax, double threshold) {
+                              boolean isEDM, float globalMin, float globalMax, double threshold) {
         Rectangle roi = ip.getRoi();
         byte[] types = (byte[]) typeP.getPixels();
         int nMax = 0;  //counts local maxima
@@ -534,20 +543,20 @@ public class SilentMaximumFinder implements PlugInFilter {
     /**
      * Check all maxima in list maxPoints, mark type of the points in typeP
      *
-     * @param ip the image to be analyzed
-     * @param typeP 8-bit image, here the point types are marked by type: MAX_POINT, etc.
-     * @param maxPoints input: a list of all local maxima, sorted by height. Lower 32 bits are pixel offset
+     * @param ip              the image to be analyzed
+     * @param typeP           8-bit image, here the point types are marked by type: MAX_POINT, etc.
+     * @param maxPoints       input: a list of all local maxima, sorted by height. Lower 32 bits are pixel offset
      * @param excludeEdgesNow whether to avoid edge maxima
-     * @param isEDM whether ip is a (float) Euclidian distance map
-     * @param globalMin minimum pixel value in ip
-     * @param tolerance minimum pixel value difference for two separate maxima
+     * @param isEDM           whether ip is a (float) Euclidian distance map
+     * @param globalMin       minimum pixel value in ip
+     * @param tolerance       minimum pixel value difference for two separate maxima
      * @param maxSortingError sorting may be inaccurate, sequence may be reversed for maxima having values not deviating
-     * from each other by more than this (this could be a result of precision loss when sorting ints instead of floats,
-     * or because sorting does not take the height correction in 'trueEdmHeight' into account
+     *                        from each other by more than this (this could be a result of precision loss when sorting ints instead of floats,
+     *                        or because sorting does not take the height correction in 'trueEdmHeight' into account
      * @param outputType
      */
     void analyzeAndMarkMaxima(ImageProcessor ip, ByteProcessor typeP, long[] maxPoints, boolean excludeEdgesNow,
-            boolean isEDM, float globalMin, double tolerance, int outputType, float maxSortingError) {
+                              boolean isEDM, float globalMin, double tolerance, int outputType, float maxSortingError) {
         byte[] types = (byte[]) typeP.getPixels();
         float[] edmPixels = isEDM ? (float[]) ip.getPixels() : null;
         int nMax = maxPoints.length;
@@ -749,14 +758,15 @@ public class SilentMaximumFinder implements PlugInFilter {
      * Create an 8-bit image by scaling the pixel values of ip to 1-254 (<lower threshold 0) and mark maximum areas as
      * 255. For use as input for watershed segmentation @param ip The original image that should be segmented @param
      * typeP Pixel t
-     *
+     * <p>
      * y
      * pes in ip
-     * @param isEDM Whether ip is an Euclidian distance map
+     *
+     * @param isEDM     Whether ip is an Euclidian distance map
      * @param globalMin The minimum pixel value of ip
      * @param globalMax The maximum pixel value of ip
      * @param threshold Pixels of ip below this value (calibrated) are considered background. Ignored if
-     * ImageProcessor.NO_THRESHOLD
+     *                  ImageProcessor.NO_THRESHOLD
      * @return The 8-bit output image.
      */
     ByteProcessor make8bit(ImageProcessor ip, ByteProcessor typeP, boolean isEDM, float globalMin, float globalMax, double threshold) {
@@ -805,8 +815,8 @@ public class SilentMaximumFinder implements PlugInFilter {
      * point sampled is not necessarily at the highest position. For simplicity, we don't care about the Sqrt(5)
      * distance here although this would be more accurate
      *
-     * @param x x-position of the point
-     * @param y y-position of the point
+     * @param x  x-position of the point
+     * @param y  y-position of the point
      * @param ip the EDM (FloatProcessor)
      * @return estimated height
      */
@@ -849,8 +859,8 @@ public class SilentMaximumFinder implements PlugInFilter {
      * to successively lower levels until a marked maximum is touched (or the plateau of a previously eliminated maximum
      * leads to a marked maximum). Then set all the points above this value to this value
      *
-     * @param outIp the image containing the pixel values
-     * @param typeP the types of the pixels are marked here
+     * @param outIp     the image containing the pixel values
+     * @param typeP     the types of the pixels are marked here
      * @param maxPoints array containing the coordinates of all maxima that might be relevant
      */
     void cleanupMaxima(ByteProcessor outIp, ByteProcessor typeP, long[] maxPoints) {
@@ -974,10 +984,11 @@ public class SilentMaximumFinder implements PlugInFilter {
     /**
      * Analyze the neighbors of a pixel (x, y) in a byte image; pixels <255 ("non-white") are considered foreground.
      * Edge pixels are considered foreground. @param ip @param x coordinate of the point @param y coordinate
-     *
+     * <p>
      * o
      * f
      * the point
+     *
      * @return Number of 4-connected lines emanating from this point. Zero if the point is embedded in either foreground
      * or background
      */
@@ -1033,9 +1044,9 @@ public class SilentMaximumFinder implements PlugInFilter {
      * delete particles corresponding to edge maxima
      *
      * @param typeP Here the pixel types of the original image are noted, pixels with bit MAX_AREA at the edge are
-     * considered indicators of an edge maximum.
-     * @param ip the image resulting from watershed segmentaiton (foreground pixels, i.e. particles, are 255, background
-     * 0)
+     *              considered indicators of an edge maximum.
+     * @param ip    the image resulting from watershed segmentaiton (foreground pixels, i.e. particles, are 255, background
+     *              0)
      */
     void deleteEdgeParticles(ByteProcessor ip, ByteProcessor typeP) {
         byte[] pixels = (byte[]) ip.getPixels();
@@ -1216,18 +1227,18 @@ public class SilentMaximumFinder implements PlugInFilter {
     /**
      * dilate the UEP on one level by one pixel in the direction specified by step, i.e., set pixels to 255
      *
-     * @param pass gives direction of dilation, see makeFateTable
-     * @param ip the EDM with the segmeted blobs successively getting set to 255
-     * @param table The fateTable
-     * @param levelStart offsets of the level in pixelPointers[]
-     * @param levelNPoints number of points in the current level
+     * @param pass            gives direction of dilation, see makeFateTable
+     * @param ip              the EDM with the segmeted blobs successively getting set to 255
+     * @param table           The fateTable
+     * @param levelStart      offsets of the level in pixelPointers[]
+     * @param levelNPoints    number of points in the current level
      * @param pixelPointers[] list of pixel coordinates (x+y*width) sorted by level (in sequence of y, x within each
-     * level)
-     * @param xCoordinates list of x Coorinates for the current level only (no offset levelStart)
+     *                        level)
+     * @param xCoordinates    list of x Coorinates for the current level only (no offset levelStart)
      * @return number of pixels that have been changed
      */
     private int processLevel(int pass, ImageProcessor ip, int[] fateTable,
-            int levelStart, int levelNPoints, int[] coordinates, int[] setPointList) {
+                             int levelStart, int levelNPoints, int[] coordinates, int[] setPointList) {
         int xmax = width - 1;
         int ymax = height - 1;
         byte[] pixels = (byte[]) ip.getPixels();
@@ -1351,8 +1362,8 @@ public class SilentMaximumFinder implements PlugInFilter {
      * returns whether the neighbor in a given direction is within the image NOTE: it is assumed that the pixel x,y
      * itself is within the image! Uses class variables width, height: dimensions of the image
      *
-     * @param x x-coordinate of the pixel that has a neighbor in the given direction
-     * @param y y-coordinate of the pixel that has a neighbor in the given direction
+     * @param x         x-coordinate of the pixel that has a neighbor in the given direction
+     * @param y         y-coordinate of the pixel that has a neighbor in the given direction
      * @param direction the direction from the pixel towards the neighbor (see makeDirectionOffsets)
      * @return true if the neighbor is within the image (provided that x, y is within)
      */

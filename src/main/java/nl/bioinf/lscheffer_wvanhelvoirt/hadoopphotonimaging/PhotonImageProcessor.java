@@ -24,8 +24,8 @@ import ij.plugin.filter.RankFilters;
 import ij.process.ImageProcessor;
 import ij.process.ShortProcessor;
 import org.apache.hadoop.io.IntWritable;
-import java.awt.Polygon;
-import java.awt.Rectangle;
+
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
@@ -33,7 +33,6 @@ import java.util.List;
 
 /**
  * PhotonImageProcessor
- *
  * This class is able to process a single photon event image and combine multiple of the images to one hi-res image.
  * Each light point within the image (based on user given tolerance value) is being processed as photon. Each photon
  * has a center that can be calculated in a fast or a more accurate way. There are two accurate calculations available.
@@ -44,21 +43,32 @@ import java.util.List;
  */
 public class PhotonImageProcessor {
 
-    /** The ImageProcessor. */
+    /**
+     * The ImageProcessor.
+     */
     private ImageProcessor ip;
-    /** IntWritable two D array for counting photons. */
+    /**
+     * IntWritable two D array for counting photons.
+     */
     private IntWritable[][] photonCountMatrix;
-    /** Noise tolerance, default is 100. */
+    /**
+     * Noise tolerance, default is 100.
+     */
     private double tolerance;
-    /** This boolean tells whether the user wants to perform pre-processing. */
+    /**
+     * This boolean tells whether the user wants to perform pre-processing.
+     */
     private boolean preprocessing;
-    /** The output method (fast/accurate/sub-pixel resolution) is set to fast. */
+    /**
+     * The output method (fast/accurate/sub-pixel resolution) is set to fast.
+     */
     private String method;
 
     /**
      * Constructor used in the ImageFileOutputFormat class.
      */
-    public PhotonImageProcessor() {}
+    public PhotonImageProcessor() {
+    }
 
     /**
      * Constructor used for the Mapper.
@@ -90,7 +100,7 @@ public class PhotonImageProcessor {
         rawCoordinates = this.findPhotons(this.ip);
 
         // Set the default values for the photonCountMatrix to zero.
-        for (int i = 0; i < this.photonCountMatrix[0].length; i++){
+        for (int i = 0; i < this.photonCountMatrix[0].length; i++) {
             for (int j = 0; j < this.photonCountMatrix.length; j++) {
                 this.photonCountMatrix[i][j] = new IntWritable(0);
             }
@@ -104,7 +114,7 @@ public class PhotonImageProcessor {
             // Calculating the auto threshold takes relatively long so this function is only called once per image.
             if (this.method.equals("Accurate")) {
                 processPhotonsAccurate(this.ip, rawCoordinates);
-            // Else method equals "Subpixel resolution"
+                // Else method equals "Subpixel resolution"
             } else {
                 processPhotonsSubPixel(this.ip, rawCoordinates);
             }
@@ -133,7 +143,7 @@ public class PhotonImageProcessor {
      * This method is called when processing photons using the 'accurate' method.
      * The exact coordinates are calculated, and then floored and added to the count matrix.
      *
-     * @param ip the ImageProcessor of the current image slice
+     * @param ip             the ImageProcessor of the current image slice
      * @param rawCoordinates a polygon containing the coordinates as found by MaximumFinder
      */
     private void processPhotonsAccurate(final ImageProcessor ip, final Polygon rawCoordinates) {
@@ -142,7 +152,7 @@ public class PhotonImageProcessor {
             // Loop through all raw coordinates, calculate the exact coordinates, floor these and add them to the
             // count matrix.
             double[] exactCoordinates = this.calculateExactCoordinates(rawCoordinates.xpoints[i],
-                                                                       rawCoordinates.ypoints[i], ip);
+                    rawCoordinates.ypoints[i], ip);
             this.photonCountMatrix[(int) exactCoordinates[0]][(int) exactCoordinates[1]].set(
                     this.photonCountMatrix[(int) exactCoordinates[0]][(int) exactCoordinates[1]].get() + 1);
         }
@@ -152,7 +162,7 @@ public class PhotonImageProcessor {
      * This method is called when processing photons using the 'subpixel resolution' method.
      * The exact coordinates are calculated, and then multiplied by two and added to the count matrix.
      *
-     * @param ip the ImageProcessor of the current image slice
+     * @param ip             the ImageProcessor of the current image slice
      * @param rawCoordinates a polygon containing the coordinates as found by MaximumFinder
      */
     private void processPhotonsSubPixel(final ImageProcessor ip, final Polygon rawCoordinates) {
@@ -161,8 +171,8 @@ public class PhotonImageProcessor {
             // Loop through all raw coordinates, calculate the exact coordinates, double these and add them to the
             // count matrix.
             double[] exactCoordinates = this.calculateExactCoordinates(rawCoordinates.xpoints[i],
-                                                                       rawCoordinates.ypoints[i],
-                                                                       ip);
+                    rawCoordinates.ypoints[i],
+                    ip);
             this.photonCountMatrix[(int) exactCoordinates[0] * 2][(int) exactCoordinates[1] * 2].set(
                     this.photonCountMatrix[(int) exactCoordinates[0] * 2][(int) exactCoordinates[1] * 2].get() + 1);
         }
@@ -206,7 +216,7 @@ public class PhotonImageProcessor {
      *
      * @param xCor Original x coordinate as found by MaximumFinder.
      * @param yCor Original y coordinate as found by MaximumFinder.
-     * @param ip ImageProcessor.
+     * @param ip   ImageProcessor.
      * @return The new calculated coordinates.
      */
     private double[] calculateExactCoordinates(final int xCor, final int yCor, final ImageProcessor ip) {
@@ -251,7 +261,7 @@ public class PhotonImageProcessor {
         ShortProcessor sp = new ShortProcessor(value[0].length, value.length);
 
         // Add all the count values to the ShortProcessor.
-        for (int i = 0; i < value[0].length; i++){
+        for (int i = 0; i < value[0].length; i++) {
             for (int j = 0; j < value.length; j++) {
                 sp.set(i, j, value[i][j].get());
             }

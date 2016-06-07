@@ -27,7 +27,6 @@ import org.apache.hadoop.util.ToolRunner;
 
 /**
  * ParallelPhotonImageProcessor
- *
  * This class runs the Hadoop MapReduce job. It assigns a mapper and reducer and is able to run the PhotonImageProcessor
  * class written for ImageJ/Fiji. Users can change the job name by assigning a value to the 'mapreduce.job.name' option.
  * 'input.files' and 'output.dir' options are required.
@@ -35,6 +34,12 @@ import org.apache.hadoop.util.ToolRunner;
  * @author Lonneke Scheffer and Wout van Helvoirt
  */
 public final class ParallelPhotonImageProcessor extends Configured implements Tool {
+
+    /**
+     * Private constructor, necessary for the ToolRunner in main.
+     */
+    private ParallelPhotonImageProcessor() {
+    }
 
     /**
      * Main function for running the program.
@@ -51,11 +56,6 @@ public final class ParallelPhotonImageProcessor extends Configured implements To
             System.out.println("A problem occurred: " + e.getMessage());
         }
     }
-
-    /**
-     * Private constructor, necessary for the ToolRunner in main.
-     */
-    private ParallelPhotonImageProcessor() { }
 
     /**
      * ToolRunner override method which contains the code to run the Hadoop MapReduce job.

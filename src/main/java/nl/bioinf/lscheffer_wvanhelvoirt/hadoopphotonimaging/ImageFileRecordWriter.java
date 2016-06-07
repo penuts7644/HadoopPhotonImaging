@@ -22,22 +22,26 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
+
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 
 /**
  * ImageFileRecordWriter
- *
  * This is a custom class to write the output of the Reducer to a png file.
  *
  * @author Lonneke Scheffer and Wout van Helvoirt
  */
 public class ImageFileRecordWriter extends RecordWriter<NullWritable, IntTwoDArrayWritable> {
 
-    /** The Configuration. */
+    /**
+     * The Configuration.
+     */
     private final Configuration mConf;
-    /** Output file path. */
+    /**
+     * Output file path.
+     */
     private final Path mOutputPath;
 
     /**
@@ -54,9 +58,9 @@ public class ImageFileRecordWriter extends RecordWriter<NullWritable, IntTwoDArr
     /**
      * Override method that writes the Reducer output to a file.
      *
-     * @param key NullWritable which will not be used.
+     * @param key   NullWritable which will not be used.
      * @param value IntTwoDArrayWritable containing the count data.
-     * @throws IOException Returns default exception.
+     * @throws IOException          Returns default exception.
      * @throws InterruptedException If connection problem.
      */
     @Override
@@ -78,7 +82,7 @@ public class ImageFileRecordWriter extends RecordWriter<NullWritable, IntTwoDArr
     /**
      * Closes any connection. Not used.
      *
-     * @throws IOException Returns default exception.
+     * @throws IOException          Returns default exception.
      * @throws InterruptedException If connection problem.
      */
     @Override

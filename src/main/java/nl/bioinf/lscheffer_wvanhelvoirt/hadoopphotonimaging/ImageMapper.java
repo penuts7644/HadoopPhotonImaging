@@ -21,12 +21,12 @@ import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Mapper;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 /**
  * ImageMapper
- *
  * The Mapper class will receive one RecordReader, and process it. One RecordReader contains one image, from which the
  * photons will be counted. The created two D array will wrapped in a IntTwoDArrayWritable passed on to the Reducer.
  *
@@ -34,16 +34,18 @@ import java.io.IOException;
  */
 public class ImageMapper extends Mapper<NullWritable, BytesWritable, NullWritable, IntTwoDArrayWritable> {
 
-    /** IntTwoDArrayWritable to be passed on to the Reducer. */
+    /**
+     * IntTwoDArrayWritable to be passed on to the Reducer.
+     */
     private IntTwoDArrayWritable photonCountMatrix;
 
     /**
      * Override method that processes one RecordReader item and send it's output to the reducing step.
      *
-     * @param key NullWritable because key will not be used.
-     * @param value BytesWritable containing a byte array from one input image.
+     * @param key     NullWritable because key will not be used.
+     * @param value   BytesWritable containing a byte array from one input image.
      * @param context Context containing job information.
-     * @throws IOException When something went wrong.
+     * @throws IOException          When something went wrong.
      * @throws InterruptedException When connection was interrupted.
      */
     @Override

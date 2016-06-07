@@ -25,11 +25,11 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
+
 import java.io.IOException;
 
 /**
  * ImageFileInputFormat
- *
  * This is a custom InputFormat class for image file that should not be split.
  *
  * @author Lonneke Scheffer and Wout van Helvoirt
@@ -40,7 +40,7 @@ public class ImageFileInputFormat extends FileInputFormat<NullWritable, BytesWri
      * Method that tells if a given image file is splittable.
      *
      * @param context The job context.
-     * @param file The path of the file.
+     * @param file    The path of the file.
      * @return boolean if the file should be split.
      */
     @Override
@@ -51,7 +51,7 @@ public class ImageFileInputFormat extends FileInputFormat<NullWritable, BytesWri
     /**
      * Creates a ImageFileRecordReader to read each file assigned to this InputSplit.
      *
-     * @param split The InputSplit to read. Throws an IllegalArgumentException if this is not a FileSplit.
+     * @param split   The InputSplit to read. Throws an IllegalArgumentException if this is not a FileSplit.
      * @param context The context for this task.
      * @return ImageFileRecordReader to process each file in split.
      * @throws IOException If there is an error.
