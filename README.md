@@ -40,6 +40,22 @@ The command consists out of:
 * Optional: Set the noise tolerance (tolerance). Default value is '100'.
 * Optional: Enable preprocessing (preprocessing), 'true' or 'false'. Default value is 'true'.
 
+### Troubleshooting ###
+
+If you run want to run the Hadoop job using a Macintosh machine, you could get the following error:
+
+    Exception in thread "main" java.io.IOException: Mkdirs failed to create /var/folders/1k/799h3b_s4pd87bg9d2mfv7k00000gn/T/hadoop-unjar7265077405644854771/META-INF/license
+        at org.apache.hadoop.util.RunJar.ensureDirectory(RunJar.java:128)
+        at org.apache.hadoop.util.RunJar.unJar(RunJar.java:104)
+        at org.apache.hadoop.util.RunJar.unJar(RunJar.java:81)
+        at org.apache.hadoop.util.RunJar.run(RunJar.java:209)
+        at org.apache.hadoop.util.RunJar.main(RunJar.java:136)
+
+This error can be fixed by removing 'META-INF/LICENSE' (note the capitals) from the jar file. This can be done by
+executing the command below in the same directory where the jar file is located.
+
+    zip -d HadoopPhotonImaging.jar META-INF/LICENSE
+
 ### Our use case ###
 
 We used 300000 small tiff files of about 650 Kb each. We first created a plugin for ImageJ to process these images,
