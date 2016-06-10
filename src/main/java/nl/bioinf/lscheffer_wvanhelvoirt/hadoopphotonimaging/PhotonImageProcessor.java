@@ -33,6 +33,7 @@ import java.util.List;
 
 /**
  * PhotonImageProcessor
+ *
  * This class is able to process a single photon event image and combine multiple of the images to one hi-res image.
  * Each light point within the image (based on user given tolerance value) is being processed as photon. Each photon
  * has a center that can be calculated in a fast or a more accurate way. There are two accurate calculations available.
@@ -43,25 +44,15 @@ import java.util.List;
  */
 public class PhotonImageProcessor {
 
-    /**
-     * The ImageProcessor.
-     */
+    /** The ImageProcessor. */
     private ImageProcessor ip;
-    /**
-     * IntWritable two D array for counting photons.
-     */
+    /** IntWritable two D array for counting photons. */
     private IntWritable[][] photonCountMatrix;
-    /**
-     * Noise tolerance, default is 100.
-     */
+    /** Noise tolerance, default is 100. */
     private double tolerance;
-    /**
-     * This boolean tells whether the user wants to perform pre-processing.
-     */
+    /** This boolean tells whether the user wants to perform pre-processing. */
     private boolean preprocessing;
-    /**
-     * The output method (fast/accurate/sub-pixel resolution) is set to fast.
-     */
+    /** The output method (fast/accurate/sub-pixel resolution) is set to fast. */
     private String method;
 
     /**

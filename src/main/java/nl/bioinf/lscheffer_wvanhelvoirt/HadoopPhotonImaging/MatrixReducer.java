@@ -24,19 +24,16 @@ import java.io.IOException;
 
 /**
  * MatrixReducer
+ *
  * The Reducer class that combines the data from all the mappers to a single two D array.
  *
  * @author Lonneke Scheffer and Wout van Helvoirt
  */
 public class MatrixReducer extends Reducer<NullWritable, IntTwoDArrayWritable, NullWritable, IntTwoDArrayWritable> {
 
-    /**
-     * Final IntTwoDArrayWritable with combined counts.
-     */
+    /** Final IntTwoDArrayWritable with combined counts. */
     private IntTwoDArrayWritable finalPhotonCountMatrix;
-    /**
-     * A Intermediate two D array.
-     */
+    /** A Intermediate two D array. */
     private IntWritable[][] photonCountMatrix;
 
     /**

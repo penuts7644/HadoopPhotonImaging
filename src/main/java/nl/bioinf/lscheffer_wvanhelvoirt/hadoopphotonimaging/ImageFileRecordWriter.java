@@ -29,19 +29,16 @@ import java.io.IOException;
 
 /**
  * ImageFileRecordWriter
+ *
  * This is a custom class to write the output of the Reducer to a png file.
  *
  * @author Lonneke Scheffer and Wout van Helvoirt
  */
 public class ImageFileRecordWriter extends RecordWriter<NullWritable, IntTwoDArrayWritable> {
 
-    /**
-     * The Configuration.
-     */
+    /** The Configuration. */
     private final Configuration mConf;
-    /**
-     * Output file path.
-     */
+    /** Output file path. */
     private final Path mOutputPath;
 
     /**

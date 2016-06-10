@@ -25,6 +25,7 @@ import java.io.IOException;
 
 /**
  * ImageFileOutputFormat
+ *
  * This is a custom OutputFormat class for image files.
  *
  * @author Lonneke Scheffer and Wout van Helvoirt

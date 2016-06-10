@@ -27,6 +27,7 @@ import java.io.IOException;
 
 /**
  * ImageMapper
+ *
  * The Mapper class will receive one RecordReader, and process it. One RecordReader contains one image, from which the
  * photons will be counted. The created two D array will wrapped in a IntTwoDArrayWritable passed on to the Reducer.
  *
@@ -34,9 +35,7 @@ import java.io.IOException;
  */
 public class ImageMapper extends Mapper<NullWritable, BytesWritable, NullWritable, IntTwoDArrayWritable> {
 
-    /**
-     * IntTwoDArrayWritable to be passed on to the Reducer.
-     */
+    /** IntTwoDArrayWritable to be passed on to the Reducer. */
     private IntTwoDArrayWritable photonCountMatrix;
 
     /**

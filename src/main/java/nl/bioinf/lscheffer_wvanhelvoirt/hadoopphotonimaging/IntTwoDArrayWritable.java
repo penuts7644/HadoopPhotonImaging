@@ -25,19 +25,16 @@ import java.io.IOException;
 
 /**
  * IntTwoDArrayWritable
+ *
  * A Custom Writable class based on the TwoDArrayWritable, but uses IntWritable's instead of Writable's.
  *
  * @author Lonneke Scheffer and Wout van Helvoirt
  */
 public class IntTwoDArrayWritable implements Writable {
 
-    /**
-     * The class type.
-     */
+    /** The class type. */
     private final Class valueClass;
-    /**
-     * A IntWritable two D array to be used internally.
-     */
+    /** A IntWritable two D array to be used internally. */
     private IntWritable[][] values;
 
     /**

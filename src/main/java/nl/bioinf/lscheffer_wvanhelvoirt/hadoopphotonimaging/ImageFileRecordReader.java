@@ -32,31 +32,22 @@ import java.io.InputStream;
 
 /**
  * ImageFileRecordReader
+ *
  * This is a custom class to create a RecordReader for each split.
  *
  * @author Lonneke Scheffer and Wout van Helvoirt
  */
 public class ImageFileRecordReader extends RecordReader<NullWritable, BytesWritable> {
 
-    /**
-     * The path to the file to read.
-     */
+    /** The path to the file to read. */
     private final Path mFileToRead;
-    /**
-     * The length of this file.
-     */
+    /** The length of this file. */
     private final long mFileLength;
-    /**
-     * The Configuration.
-     */
+    /** The Configuration. */
     private final Configuration mConf;
-    /**
-     * A BytesWritable to store the byte array.
-     */
+    /** A BytesWritable to store the byte array. */
     private final BytesWritable mFileBytes;
-    /**
-     * Whether this FileSplit has been processed.
-     */
+    /** Whether this FileSplit has been processed. */
     private boolean mProcessed;
 
     /**

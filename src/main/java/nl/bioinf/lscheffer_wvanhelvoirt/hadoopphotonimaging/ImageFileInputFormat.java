@@ -30,6 +30,7 @@ import java.io.IOException;
 
 /**
  * ImageFileInputFormat
+ *
  * This is a custom InputFormat class for image file that should not be split.
  *
  * @author Lonneke Scheffer and Wout van Helvoirt
