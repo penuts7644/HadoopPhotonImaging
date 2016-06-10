@@ -71,6 +71,7 @@ a lot.
 
 * Look into removing Sorting option.
 * User definable, amount of images to be processed by one mapper.
+* A tiff file writer that writes the output image as tiff to the hdfs instead of png.
 * Looking into a image processing interface's like [HIPI](http://hipi.cs.virginia.edu), which could greatly improve
 efficiency of storing the image files on the HDFS as well as the creation of the splits/readers, mapping and reducing
 stage.
