@@ -23,12 +23,12 @@ import ij.io.Opener;
 import ij.plugin.filter.RankFilters;
 import ij.process.ImageProcessor;
 import ij.process.ShortProcessor;
-import org.apache.hadoop.io.IntWritable;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 
 /**
@@ -46,8 +46,8 @@ public class PhotonImageProcessor {
 
     /** The ImageProcessor. */
     private ImageProcessor ip;
-    /** IntWritable two D array for counting photons. */
-    private IntWritable[][] photonCountMatrix;
+    /** LinkedList containing int arrays with xy positions with one count. */
+    private LinkedList<int[]> coordinateCounts;
     /** Noise tolerance, default is 100. */
     private double tolerance;
     /** This boolean tells whether the user wants to perform pre-processing. */
@@ -66,7 +66,7 @@ public class PhotonImageProcessor {
      */
     public PhotonImageProcessor(ByteArrayInputStream bais, int tolerance, String method, boolean preprocessing) {
         this.ip = new Opener().openTiff(bais, "tiff_image").getProcessor();
-        this.photonCountMatrix = new IntWritable[this.ip.getWidth()][this.ip.getHeight()];
+        this.coordinateCounts = new LinkedList<>();
         this.tolerance = tolerance;
         this.method = method;
         this.preprocessing = preprocessing;
@@ -77,9 +77,11 @@ public class PhotonImageProcessor {
     }
 
     /**
-     * This method will start the core of this class and creates a photonCountMatrix.
+     * This method will start the core of this class and calculates the xy coordinates.
+     *
+     * @return LinkedList Containing int arrays with xy coordinates.
      */
-    public IntWritable[][] createPhotonCountMatrix() {
+    public LinkedList<int[]> createPhotonCountMatrix() {
         Polygon rawCoordinates;
 
         // Pre-process the current slice.
@@ -89,13 +91,6 @@ public class PhotonImageProcessor {
 
         // Find the photon coordinates.
         rawCoordinates = this.findPhotons(this.ip);
-
-        // Set the default values for the photonCountMatrix to zero.
-        for (int i = 0; i < this.photonCountMatrix[0].length; i++) {
-            for (int j = 0; j < this.photonCountMatrix.length; j++) {
-                this.photonCountMatrix[i][j] = new IntWritable(0);
-            }
-        }
 
         // If previewing enabled, show found maxima's on slice.
         if (this.method.equals("Fast")) {
@@ -111,61 +106,61 @@ public class PhotonImageProcessor {
             }
         }
 
-        // Return the IntWritable two D array with photon counts.
-        return this.photonCountMatrix;
+        // Return the LinkedList with coordinate arrays.
+        return this.coordinateCounts;
     }
 
     /**
      * This method is called when processing photons using the 'fast' method.
-     * All photons are added to the photon count matrix, without altering.
+     * All photons are added to the LinkedList as array, without altering.
      *
-     * @param rawCoordinates a polygon containing the coordinates as found by MaximumFinder
+     * @param rawCoordinates A polygon containing the coordinates as found by MaximumFinder
      */
     private void processPhotonsFast(final Polygon rawCoordinates) {
 
-        // Loop through all raw coordinates and add them to the count matrix.
+        // Loop through all raw coordinates and add them to the LinkedList as array.
         for (int i = 0; i < rawCoordinates.npoints; i++) {
-            this.photonCountMatrix[rawCoordinates.xpoints[i]][rawCoordinates.ypoints[i]].set(
-                    this.photonCountMatrix[rawCoordinates.xpoints[i]][rawCoordinates.ypoints[i]].get() + 1);
+            int[] intArray = {rawCoordinates.xpoints[i], rawCoordinates.ypoints[i]};
+            this.coordinateCounts.add(i, intArray);
         }
     }
 
     /**
      * This method is called when processing photons using the 'accurate' method.
-     * The exact coordinates are calculated, and then floored and added to the count matrix.
+     * The exact coordinates are calculated, and then floored and added to the LinkedList as array.
      *
-     * @param ip             the ImageProcessor of the current image slice
-     * @param rawCoordinates a polygon containing the coordinates as found by MaximumFinder
+     * @param ip             The ImageProcessor of the current image slice
+     * @param rawCoordinates A polygon containing the coordinates as found by MaximumFinder
      */
     private void processPhotonsAccurate(final ImageProcessor ip, final Polygon rawCoordinates) {
         for (int i = 0; i < rawCoordinates.npoints; i++) {
 
             // Loop through all raw coordinates, calculate the exact coordinates, floor these and add them to the
-            // count matrix.
+            // LinkedList as array.
             double[] exactCoordinates = this.calculateExactCoordinates(rawCoordinates.xpoints[i],
                     rawCoordinates.ypoints[i], ip);
-            this.photonCountMatrix[(int) exactCoordinates[0]][(int) exactCoordinates[1]].set(
-                    this.photonCountMatrix[(int) exactCoordinates[0]][(int) exactCoordinates[1]].get() + 1);
+            int[] intArray = {(int) exactCoordinates[0], (int) exactCoordinates[1]};
+            this.coordinateCounts.add(i, intArray);
         }
     }
 
     /**
      * This method is called when processing photons using the 'subpixel resolution' method.
-     * The exact coordinates are calculated, and then multiplied by two and added to the count matrix.
+     * The exact coordinates are calculated, and then multiplied by two and added to the LinkedList as array.
      *
-     * @param ip             the ImageProcessor of the current image slice
-     * @param rawCoordinates a polygon containing the coordinates as found by MaximumFinder
+     * @param ip             The ImageProcessor of the current image slice
+     * @param rawCoordinates A polygon containing the coordinates as found by MaximumFinder
      */
     private void processPhotonsSubPixel(final ImageProcessor ip, final Polygon rawCoordinates) {
         for (int i = 0; i < rawCoordinates.npoints; i++) {
 
             // Loop through all raw coordinates, calculate the exact coordinates, double these and add them to the
-            // count matrix.
+            // LinkedList as array.
             double[] exactCoordinates = this.calculateExactCoordinates(rawCoordinates.xpoints[i],
                     rawCoordinates.ypoints[i],
                     ip);
-            this.photonCountMatrix[(int) exactCoordinates[0] * 2][(int) exactCoordinates[1] * 2].set(
-                    this.photonCountMatrix[(int) exactCoordinates[0] * 2][(int) exactCoordinates[1] * 2].get() + 1);
+            int[] intArray = {(int) exactCoordinates[0] * 2, (int) exactCoordinates[1] * 2};
+            this.coordinateCounts.add(i, intArray);
         }
     }
 
@@ -241,22 +236,16 @@ public class PhotonImageProcessor {
     }
 
     /**
-     * This method generates a BufferedImage from the intWritable two D array and returns it
+     * This method generates a BufferedImage from the int two D array and returns it.
      *
-     * @param value IntWritable two D array containing all the count values.
-     * @return BufferedImage from the IntWritable two D array.
+     * @param value int two D array containing all the count values.
+     * @return BufferedImage from the int two D array.
      */
-    public BufferedImage createBufferedImage(IntWritable[][] value) {
+    public BufferedImage createBufferedImage(int[][] value) {
 
         // Create new ShortProcessor for output image with matrix data and it's width and height.
         ShortProcessor sp = new ShortProcessor(value[0].length, value.length);
-
-        // Add all the count values to the ShortProcessor.
-        for (int i = 0; i < value[0].length; i++) {
-            for (int j = 0; j < value.length; j++) {
-                sp.set(i, j, value[i][j].get());
-            }
-        }
+        sp.setIntArray(value);
 
         // Add the amount of different values in array.
         List<Integer> diffMatrixCount = new ArrayList<>();

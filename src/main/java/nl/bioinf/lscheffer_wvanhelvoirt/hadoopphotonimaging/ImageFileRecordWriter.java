@@ -19,7 +19,8 @@ package nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhotonImaging;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
@@ -34,12 +35,14 @@ import java.io.IOException;
  *
  * @author Lonneke Scheffer and Wout van Helvoirt
  */
-public class ImageFileRecordWriter extends RecordWriter<NullWritable, IntTwoDArrayWritable> {
+public class ImageFileRecordWriter extends RecordWriter<Text, IntWritable> {
 
     /** The Configuration. */
     private final Configuration mConf;
     /** Output file path. */
     private final Path mOutputPath;
+    /** The matrix for each xy count. */
+    private int[][] countMatrix;
 
     /**
      * Implementation detail: This constructor is built to be called via
@@ -50,18 +53,38 @@ public class ImageFileRecordWriter extends RecordWriter<NullWritable, IntTwoDArr
     public ImageFileRecordWriter(TaskAttemptContext context) {
         this.mConf = context.getConfiguration();
         this.mOutputPath = new Path(this.mConf.get("output.dir"), "HadoopPhotonImaging.png");
+        this.countMatrix = new int[this.mConf.getInt("images.height", 0)][this.mConf.getInt("images.width", 0)];
     }
 
     /**
      * Override method that writes the Reducer output to a file.
      *
-     * @param key   NullWritable which will not be used.
-     * @param value IntTwoDArrayWritable containing the count data.
+     * @param key   Text with xy location.
+     * @param value IntWritable containing the count.
      * @throws IOException          Returns default exception.
      * @throws InterruptedException If connection problem.
      */
     @Override
-    public void write(NullWritable key, IntTwoDArrayWritable value)
+    public void write(Text key, IntWritable value)
+            throws IOException, InterruptedException {
+
+        // Add the value count on the correct xy location.
+        try {
+            this.countMatrix[Integer.parseInt(key.toString().split("\\|")[0])]
+                    [Integer.parseInt(key.toString().split("\\|")[1])] = value.get();
+        } catch (ArrayIndexOutOfBoundsException e) {
+            throw new IOException("The given images.width or images.height is to small.");
+        }
+    }
+
+    /**
+     * Closes any connection.
+     *
+     * @throws IOException          Returns default exception.
+     * @throws InterruptedException If connection problem.
+     */
+    @Override
+    public void close(TaskAttemptContext context)
             throws IOException, InterruptedException {
 
         // Set the filesystem and delete path if it exists.
@@ -71,21 +94,8 @@ public class ImageFileRecordWriter extends RecordWriter<NullWritable, IntTwoDArr
         }
 
         // Get the buffered image from the PhotonImageProcessor and write it to a png file.
-        BufferedImage bi = new PhotonImageProcessor().createBufferedImage(value.get());
+        BufferedImage bi = new PhotonImageProcessor().createBufferedImage(this.countMatrix);
         ImageIO.write(bi, "png", hdfs.create(this.mOutputPath));
         hdfs.close();
-    }
-
-    /**
-     * Closes any connection. Not used.
-     *
-     * @throws IOException          Returns default exception.
-     * @throws InterruptedException If connection problem.
-     */
-    @Override
-    public void close(TaskAttemptContext context)
-            throws IOException, InterruptedException {
-
-        // no-op
     }
 }

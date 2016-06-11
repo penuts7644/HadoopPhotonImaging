@@ -20,7 +20,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -78,15 +79,16 @@ public final class ParallelPhotonImageProcessor extends Configured implements To
         job.setJarByClass(ParallelPhotonImageProcessor.class);
 
         // Set the mapper and reducer classes.
-        job.setMapperClass(ImageMapper.class);
-        job.setReducerClass(MatrixReducer.class);
+        job.setMapperClass(CoordinatesMapper.class);
+        job.setReducerClass(SumCoordinatesReducer.class);
 
         // Specify the mapper output key and value classes.
-        job.setOutputKeyClass(NullWritable.class);
-        job.setOutputValueClass(IntTwoDArrayWritable.class);
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(IntWritable.class);
 
         // If 'input.dir' and/or 'output.dir' not given, throw exception.
-        if (conf.get("input.files") != null && conf.get("output.dir") != null) {
+        if (conf.get("input.files") != null && conf.get("output.dir") != null
+                && conf.get("images.height") != null && conf.get("images.width") != null) {
 
             // Set a input path filter to use only tiff files in directory and set input formatting class.
             ImageFileInputFormat.setInputPathFilter(job, TiffPathFilter.class);
@@ -101,7 +103,8 @@ public final class ParallelPhotonImageProcessor extends Configured implements To
             ImageFileOutputFormat.setOutputPath(job, output);
             job.setOutputFormatClass(ImageFileOutputFormat.class);
         } else {
-            throw new IllegalArgumentException("The value of property input.files and output.dir must not be null");
+            throw new IllegalArgumentException("The value of property input.files and output.dir must not be null."
+                    + " Also, images.height and images.width must be the size of your input images.");
         }
 
         // Execute job and return status.

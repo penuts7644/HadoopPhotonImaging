@@ -16,7 +16,8 @@
 
 package nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhotonImaging;
 
-import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -30,7 +31,7 @@ import java.io.IOException;
  *
  * @author Lonneke Scheffer and Wout van Helvoirt
  */
-public class ImageFileOutputFormat extends FileOutputFormat<NullWritable, IntTwoDArrayWritable> {
+public class ImageFileOutputFormat extends FileOutputFormat<Text, IntWritable> {
 
     /**
      * Creates a ImageFileRecordWriter to write the output from the Reducer to a file.
@@ -40,7 +41,7 @@ public class ImageFileOutputFormat extends FileOutputFormat<NullWritable, IntTwo
      * @throws IOException If there is an error.
      */
     @Override
-    public RecordWriter<NullWritable, IntTwoDArrayWritable> getRecordWriter(TaskAttemptContext context)
+    public RecordWriter<Text, IntWritable> getRecordWriter(TaskAttemptContext context)
             throws IOException, InterruptedException {
 
         // Return the new ImageFileRecordWriter.

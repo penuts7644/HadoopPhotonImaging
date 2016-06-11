@@ -20,23 +20,26 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 /**
- * ImageMapper
+ * CoordinatesMapper
  *
  * The Mapper class will receive one RecordReader, and process it. One RecordReader contains one image, from which the
- * photons will be counted. The created two D array will wrapped in a IntTwoDArrayWritable passed on to the Reducer.
+ * photons will be counted. The xy coordinates will be the key and count the value.
  *
  * @author Lonneke Scheffer and Wout van Helvoirt
  */
-public class ImageMapper extends Mapper<NullWritable, BytesWritable, NullWritable, IntTwoDArrayWritable> {
+public class CoordinatesMapper extends Mapper<NullWritable, BytesWritable, Text, IntWritable> {
 
-    /** IntTwoDArrayWritable to be passed on to the Reducer. */
-    private IntTwoDArrayWritable photonCountMatrix;
+    /** Text for the xy coordinates. */
+    private Text coordinates = new Text();
+    /** IntWritable with count. */
+    private final IntWritable count = new IntWritable(1);
 
     /**
      * Override method that processes one RecordReader item and send it's output to the reducing step.
@@ -59,10 +62,13 @@ public class ImageMapper extends Mapper<NullWritable, BytesWritable, NullWritabl
             PhotonImageProcessor pip = new PhotonImageProcessor(new ByteArrayInputStream(value.getBytes()),
                     conf.getInt("tolerance", 100), conf.get("method", "Fast"), conf.getBoolean("preprocessing", true));
 
-            // Run the PhotonImageProcessor on the given image and retrieve IntWritable two D array output.
-            // Add the IntWritable two D array to the IntTwoDArrayWritable wrapper and return the result.
-            this.photonCountMatrix = new IntTwoDArrayWritable(IntWritable.class, pip.createPhotonCountMatrix());
-            context.write(NullWritable.get(), this.photonCountMatrix);
+            // Run the PhotonImageProcessor on the given image and retrieve the xy coordinates.
+            for (int[] cor : pip.createPhotonCountMatrix()) {
+
+                // Write output to context.
+                this.coordinates.set(cor[0] + "|" + cor[1]);
+                context.write(this.coordinates, this.count);
+            }
         } catch (NullPointerException e) {
 
             // If error on file, skip this map.
