@@ -53,7 +53,7 @@ public class ImageFileRecordWriter extends RecordWriter<Text, IntWritable> {
     public ImageFileRecordWriter(TaskAttemptContext context) {
         this.mConf = context.getConfiguration();
         this.mOutputPath = new Path(this.mConf.get("output.dir"), "HadoopPhotonImaging.png");
-        this.countMatrix = new int[this.mConf.getInt("images.height", 0)][this.mConf.getInt("images.width", 0)];
+        this.countMatrix = new int[this.mConf.getInt("max.image.height", 0)][this.mConf.getInt("max.image.width", 0)];
     }
 
     /**
@@ -73,7 +73,7 @@ public class ImageFileRecordWriter extends RecordWriter<Text, IntWritable> {
             this.countMatrix[Integer.parseInt(key.toString().split("\\|")[0])]
                     [Integer.parseInt(key.toString().split("\\|")[1])] = value.get();
         } catch (ArrayIndexOutOfBoundsException e) {
-            throw new IOException("The given images.width or images.height is to small.");
+            throw new IOException("The given max.image.width or max.image.height is to small.");
         }
     }
 

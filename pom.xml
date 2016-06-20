@@ -2,10 +2,12 @@
 <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
     <groupId>nl.bioinf.lscheffer_wvanhelvoirt</groupId>
     <artifactId>HadoopPhotonImaging</artifactId>
     <version>1.0</version>
     <packaging>jar</packaging>
+
     <dependencies>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
@@ -17,12 +19,8 @@
             <artifactId>ij</artifactId>
             <version>1.51a</version>
         </dependency>
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-core</artifactId>
-            <version>1.2.1</version>
-        </dependency>
     </dependencies>
+
     <properties>
         <main-class>ParallelPhotonImageProcessor</main-class>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -30,12 +28,25 @@
         <maven.compiler.target>1.7</maven.compiler.target>
     </properties>
 
+    <name>HadoopPhotonImaging</name>
     <description>This project is a modified version of the PhotonImaging plug-in for ImageJ. The Hadoop version is able
         to process single photon event data, by locating the center point of each photon. The reduce stage combines all
         the two D arrays from the mappers into one 16-bit greyscale image. Each pixel contains the amount of found
         photons and are mapped to the correct pixel value.
     </description>
-    <name>HadoopPhotonImaging</name>
+
+    <url>https://github.com/penuts7644/HadoopPhotonImaging</url>
+    <inceptionYear>2016</inceptionYear>
+    <organization>
+        <name>None</name>
+    </organization>
+    <licenses>
+        <license>
+            <name>GNU General Public License</name>
+            <url>http://www.gnu.org/licenses/</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
 
     <developers>
         <developer>
@@ -61,4 +72,59 @@
             <timezone>+1</timezone>
         </developer>
     </developers>
+
+    <contributors>
+        <contributor>
+            <name>None</name>
+        </contributor>
+    </contributors>
+
+    <scm>
+        <connection>scm:git:git://github.com/penuts7644/HadoopPhotonImaging</connection>
+        <developerConnection>scm:git:git@github.com:penuts7644/HadoopPhotonImaging</developerConnection>
+        <tag>HEAD</tag>
+        <url>https://github.com/penuts7644/HadoopPhotonImaging</url>
+    </scm>
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/penuts7644/HadoopPhotonImaging/issues</url>
+    </issueManagement>
+
+    <build>
+        <defaultGoal>install</defaultGoal>
+        <plugins>
+            <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhotonImaging.ParallelPhotonImageProcessor</mainClass>
+                        </manifest>
+                    </archive>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.5.1</version>
+                <inherited>true</inherited>
+                <configuration>
+                    <source>1.7</source>
+                    <target>1.7</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

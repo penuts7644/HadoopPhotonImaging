@@ -88,7 +88,7 @@ public final class ParallelPhotonImageProcessor extends Configured implements To
 
         // If 'input.dir' and/or 'output.dir' not given, throw exception.
         if (conf.get("input.files") != null && conf.get("output.dir") != null
-                && conf.get("images.height") != null && conf.get("images.width") != null) {
+                && conf.get("max.image.height") != null && conf.get("max.image.width") != null) {
 
             // Set a input path filter to use only tiff files in directory and set input formatting class.
             ImageFileInputFormat.setInputPathFilter(job, TiffPathFilter.class);
@@ -104,7 +104,7 @@ public final class ParallelPhotonImageProcessor extends Configured implements To
             job.setOutputFormatClass(ImageFileOutputFormat.class);
         } else {
             throw new IllegalArgumentException("The value of property input.files and output.dir must not be null."
-                    + " Also, images.height and images.width must be the size of your input images.");
+                    + " Also, max.image.height and max.image.width must be the size of your input images.");
         }
 
         // Execute job and return status.

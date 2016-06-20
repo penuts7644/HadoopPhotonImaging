@@ -31,7 +31,7 @@ import java.io.IOException;
  */
 public class SumCoordinatesReducer extends Reducer<Text, IntWritable, Text, IntWritable> {
 
-    /** intWritable with summed counts. */
+    /** IntWritable with summed counts. */
     private IntWritable sumCount = new IntWritable();
 
     /**

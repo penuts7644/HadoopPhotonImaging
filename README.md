@@ -16,17 +16,17 @@ pixel contains the amount of found photons and are mapped to the correct pixel v
 * You need a Hadoop enabled cluster and a Hadoop client from which you can run this program. More information about
 Hadoop can be found [Here](http://hadoop.apache.org).
 * This software requires at least [Java 7](https://www.oracle.com/downloads/index.html) to function.
-* The source has been written in IntelliJ IDEA 2016 and the project uses Maven for package management.
+* The source has been written in IntelliJ IDEA 2016 and the project uses Maven for package management and building.
 
 ### How to use this application ###
 
 The jar file can be run via the Hadoop client's command-line. With the command below, you can run the program.
 
-    yarn jar HadoopPhotonImaging.jar nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhotonImaging.ParallelPhotonImageProcessor
+    yarn jar HadoopPhotonImaging-1.0-jar-with-dependencies.jar
     -D input.files=[input file/files]
     -D output.dir=[output directory]
-    -D images.height=[the height of your input images]
-    -D images.width=[the width of your input images]
+    -D max.image.height=[the max height of your input images]
+    -D max.image.width=[the max width of your input images]
     -D mapreduce.job.name=[job name]
     -D method=[method type]
     -D tolerance=[amount of noise tolerance]
@@ -34,7 +34,7 @@ The jar file can be run via the Hadoop client's command-line. With the command b
 
 The command consists out of:
 
-* Main Hadoop yarn command, path to the jar file and main class location.
+* Main Hadoop yarn command and the path to the jar file.
 * Required: The input file or files in an directory. Only TIFF files will be used.
 * Required: An output directory, which will contain the created a PNG file.
 * Required: The maximum height of your input images.
@@ -58,13 +58,13 @@ If you run want to run the Hadoop job using a Macintosh machine, you could get t
 This error can be fixed by removing 'META-INF/LICENSE' (note the capitals) from the jar file. This can be done by
 executing the command below in the same directory where the jar file is located.
 
-    zip -d HadoopPhotonImaging.jar META-INF/LICENSE
+    zip -d HadoopPhotonImaging-1.0-jar-with-dependencies.jar META-INF/LICENSE
 
 ### Our use case ###
 
 We used 300000 small tiff files of about 650 Kb each. We first created a plugin for ImageJ to process these images,
-which was able to process all the files within 40 minutes on one Intel Core i7 chip. The Hadoop version creates a mapper
-for each input file and is able to process one tenth of all the files, within 40 minutes. The cluster had 97 operating 8
+which was able to process all the files within 40 minutes on one Intel Core i7 3770 chip. The Hadoop version creates a mapper
+for each input file and is able to process one tenth of all the files, within 12 minutes. The cluster had 97 operating 8
 core nodes available for this job.
 
 So why does it take so long process the files on the cluster? As said, the files are very small and each file is
@@ -75,5 +75,5 @@ a lot.
 
 * A tiff file writer that writes the output image as tiff to the hdfs instead of png.
 * Looking into a image processing interface's like [HIPI](http://hipi.cs.virginia.edu), which could greatly improve
-efficiency of storing the image files on the HDFS as well as the creation of the splits/readers, mapping and reducing
-stage.
+efficiency of storing the image files on the HDFS as well as the creation of the splits/readers. Does not read tiff
+files though.
