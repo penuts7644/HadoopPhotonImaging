@@ -36,7 +36,7 @@ import java.util.List;
  *
  * This class is able to process a single photon event image and combine multiple of the images to one hi-res image.
  * Each light point within the image (based on user given tolerance value) is being processed as photon. Each photon
- * has a center that can be calculated in a fast or a more accurate way. There are two accurate calculations available.
+ * has a center that can be calculated in a simple or a more accurate way. There are two accurate calculations available.
  * One to create a higher resolution image with four times the amount of pixels (sub-pixel resolution) or one with
  * normal resolution. Photons are being counted and mapped to the correct pixel values to create a 16-bit image.
  *
@@ -52,7 +52,7 @@ public class PhotonImageProcessor {
     private double tolerance;
     /** This boolean tells whether the user wants to perform pre-processing. */
     private boolean preprocessing;
-    /** The output method (fast/accurate/sub-pixel resolution) is set to fast. */
+    /** The output method (simple/accurate/sub-pixel resolution) is set to simple. */
     private String method;
 
     /**
@@ -93,8 +93,8 @@ public class PhotonImageProcessor {
         rawCoordinates = this.findPhotons(this.ip);
 
         // If previewing enabled, show found maxima's on slice.
-        if (this.method.equals("Fast")) {
-            this.processPhotonsFast(rawCoordinates);
+        if (this.method.equals("Simple")) {
+            this.processPhotonsSimple(rawCoordinates);
         } else {
 
             // Calculating the auto threshold takes relatively long so this function is only called once per image.
@@ -111,12 +111,12 @@ public class PhotonImageProcessor {
     }
 
     /**
-     * This method is called when processing photons using the 'fast' method.
+     * This method is called when processing photons using the 'simple' method.
      * All photons are added to the LinkedList as array, without altering.
      *
      * @param rawCoordinates A polygon containing the coordinates as found by MaximumFinder
      */
-    private void processPhotonsFast(final Polygon rawCoordinates) {
+    private void processPhotonsSimple(final Polygon rawCoordinates) {
 
         // Loop through all raw coordinates and add them to the LinkedList as array.
         for (int i = 0; i < rawCoordinates.npoints; i++) {

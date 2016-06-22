@@ -60,7 +60,7 @@ public class CoordinatesMapper extends Mapper<NullWritable, BytesWritable, Text,
         // Try to instantiate the processor.
         try {
             PhotonImageProcessor pip = new PhotonImageProcessor(new ByteArrayInputStream(value.getBytes()),
-                    conf.getInt("tolerance", 100), conf.get("method", "Fast"), conf.getBoolean("preprocessing", true));
+                    conf.getInt("tolerance", 100), conf.get("method", "Simple"), conf.getBoolean("preprocessing", true));
 
             // Run the PhotonImageProcessor on the given image and retrieve the xy coordinates.
             for (int[] cor : pip.createPhotonCountMatrix()) {

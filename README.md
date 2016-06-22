@@ -40,7 +40,7 @@ The command consists out of:
 * Required: The maximum height of your input images.
 * Required: The maximum width of your input images.
 * Optional: Set the job name (mapreduce.job.name). Default value is 'PhotonImageProcess'.
-* Optional: Set the method type (method), 'Fast', 'Accurate' and 'Subpixel'. Default value is 'Fast'.
+* Optional: Set the method type (method), 'Simple', 'Accurate' and 'Subpixel'. Default value is 'Simple'.
 * Optional: Set the noise tolerance (tolerance). Default value is 100.
 * Optional: Enable pre-processing (preprocessing), 'true' or 'false'. Default value is 'true'.
 
@@ -62,7 +62,7 @@ executing the command below in the same directory where the jar file is located.
 
 ### Our use case ###
 
-We used 300000 small tiff files of about 650 Kb each. We first created a plugin for ImageJ to process these images,
+We used 300000 small TIFF files of about 650 Kb each. We first created a plugin for ImageJ to process these images,
 which was able to process all the files within 40 minutes on one Intel Core i7 3770 chip. The Hadoop version creates a mapper
 for each input file and is able to process one tenth of all the files, within 12 minutes. The cluster had 97 operating 8
 core nodes available for this job.
@@ -73,7 +73,7 @@ a lot.
 
 ### Future idea's ###
 
-* A tiff file writer that writes the output image as tiff to the hdfs instead of png.
+* A TIFF file writer that writes the output image as TIFF to the hdfs instead of png.
 * Looking into a image processing interface's like [HIPI](http://hipi.cs.virginia.edu), which could greatly improve
-efficiency of storing the image files on the HDFS as well as the creation of the splits/readers. Does not read tiff
+efficiency of storing the image files on the HDFS as well as the creation of the splits/readers. Does not read TIFF
 files though.
