@@ -95,7 +95,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhotonImaging.ParallelPhotonImageProcessor</mainClass>
+                            <mainClass>nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhoton.ParallelPhotonImageProcessor</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

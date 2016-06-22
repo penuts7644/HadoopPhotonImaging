@@ -1,4 +1,4 @@
-package nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhotonImaging;
+package nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhoton;
 
 import ij.IJ;
 import ij.ImagePlus;

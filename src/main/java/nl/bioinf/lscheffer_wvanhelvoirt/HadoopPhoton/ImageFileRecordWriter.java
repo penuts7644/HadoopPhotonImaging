@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhotonImaging;
+package nl.bioinf.lscheffer_wvanhelvoirt.HadoopPhoton;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -52,7 +52,7 @@ public class ImageFileRecordWriter extends RecordWriter<Text, IntWritable> {
      */
     public ImageFileRecordWriter(TaskAttemptContext context) {
         this.mConf = context.getConfiguration();
-        this.mOutputPath = new Path(this.mConf.get("output.dir"), "HadoopPhotonImaging.png");
+        this.mOutputPath = new Path(this.mConf.get("output.dir"), "HadoopPhoton.png");
         this.countMatrix = new int[this.mConf.getInt("max.image.height", 0)][this.mConf.getInt("max.image.width", 0)];
     }
 
